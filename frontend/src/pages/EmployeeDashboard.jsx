@@ -577,14 +577,6 @@ export default function EmployeeDashboard() {
                     </div>
                   </div>
                 </div>
-                <div className="employee-field employee-highlight-field">
-                      <div className="employee-field-label">Latest Attendance Tag</div>
-                      <div className="employee-field-value">
-                        <span className={`member-status-tag ${activeAttendanceTag ? "is-active" : ""}`}>
-                          {activeAttendanceTag ?? (hasScheduleToday ? "Scheduled" : "Not scheduled")}
-                        </span>
-                      </div>
-                    </div>
                 <div className="employee-card-footer">
                 </div>
               </div>
