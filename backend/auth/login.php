@@ -15,8 +15,14 @@ session_start();
 
 $data = json_decode(file_get_contents("php://input"), true);
 
-$email = $data['email'] ?? '';
+$email = strtolower(trim($data['email'] ?? ''));
 $password = $data['password'] ?? '';
+
+if (!$email || !$password) {
+    http_response_code(400);
+    echo json_encode(["error" => "Email and password are required"]);
+    exit;
+}
 
 $stmt = $conn->prepare("SELECT * FROM users WHERE email=?");
 $stmt->bind_param("s", $email);

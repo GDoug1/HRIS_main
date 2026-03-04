@@ -15,9 +15,9 @@ include "../config/database.php";
 $data = json_decode(file_get_contents("php://input"), true);
 
 $fullname = trim($data['fullname'] ?? '');
-$email = trim($data['email'] ?? '');
+$email = strtolower(trim($data['email'] ?? ''));
 $password = $data['password'] ?? '';
-$role = $data['role'] ?? '';
+$role = strtolower(trim($data['role'] ?? ''));
 
 if (!$fullname || !$email || !$password || !$role) {
     http_response_code(400);
@@ -33,7 +33,11 @@ if (!in_array($role, ["coach", "employee", "admin"])) {
 
 $check = $conn->prepare("SELECT id FROM users WHERE email=?");
 $check->bind_param("s", $email);
-$check->execute();
+if (!$check->execute()) {
+    http_response_code(500);
+    echo json_encode(["error" => "Unable to validate email"]);
+    exit;
+}
 $check->store_result();
 
 if ($check->num_rows > 0) {
@@ -49,6 +53,13 @@ $stmt = $conn->prepare(
      VALUES (?, ?, ?, ?)"
 );
 $stmt->bind_param("ssss", $fullname, $email, $hashed, $role);
-$stmt->execute();
+if (!$stmt->execute()) {
+    http_response_code(500);
+    echo json_encode(["error" => "Unable to create account"]);
+    exit;
+}
 
-echo json_encode(["success" => true]);
+echo json_encode([
+    "success" => true,
+    "user_id" => $stmt->insert_id
+]);
