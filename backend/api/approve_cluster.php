@@ -20,21 +20,33 @@ if ($status === "rejected" && $rejection_reason === "") {
     exit(json_encode(["error" => "Rejection reason is required."]));
 }
 
-$safe_reason = $conn->real_escape_string($rejection_reason);
+$columns = [];
+$columnResult = $conn->query("SHOW COLUMNS FROM clusters");
+if ($columnResult) {
+    while ($row = $columnResult->fetch_assoc()) {
+        $columns[] = $row["Field"];
+    }
+}
+
+$idColumn = in_array("id", $columns, true) ? "id" : "cluster_id";
 
 if ($status === "rejected") {
-    $ok = $conn->query(
+    $stmt = $conn->prepare(
         "UPDATE clusters
-         SET status='rejected', rejection_reason='$safe_reason'
-         WHERE id=$id"
+         SET status='rejected', rejection_reason=?
+         WHERE $idColumn=?"
     );
+    $stmt->bind_param("si", $rejection_reason, $id);
 } else {
-    $ok = $conn->query(
+    $stmt = $conn->prepare(
         "UPDATE clusters
          SET status='active', rejection_reason=NULL
-         WHERE id=$id"
+         WHERE $idColumn=?"
     );
+    $stmt->bind_param("i", $id);
 }
+
+$ok = $stmt->execute();
 
 if ($ok !== true) {
     http_response_code(500);

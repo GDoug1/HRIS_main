@@ -21,7 +21,7 @@ export default function AdminDashboard() {
 
   const fetchClusters = useCallback(async () => {
     try {
-      const data = await apiFetch("api/admin_clusters.php");
+      const data = await apiFetch("api/admin_cluster.php");
       setClusters(data);
     } catch (error) {
       console.error("Failed to load clusters", error);
