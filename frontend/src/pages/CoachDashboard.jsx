@@ -41,7 +41,7 @@ export default function CoachDashboard() {
   const [employeeLoading, setEmployeeLoading] = useState(false);
   const [employeeError, setEmployeeError] = useState("");
   const [showMemberForm, setShowMemberForm] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [scheduleMember, setScheduleMember] = useState(null);
@@ -395,7 +395,7 @@ useEffect(() => {
     setMemberError("");
     setEmployeeError("");
     setShowMemberForm(false);
-    setSelectedEmployee("");
+    setSelectedEmployees([]);
     setEmployeeSearchQuery("");
 
     Promise.all([
@@ -586,7 +586,7 @@ useEffect(() => {
     setScheduleMember(null);
     setScheduleError("");
     setShowMemberForm(false);
-    setSelectedEmployee("");
+    setSelectedEmployees([]);
     setEmployeeSearchQuery("");
   };
 
@@ -864,7 +864,7 @@ useEffect(() => {
   };
 
   const handleAddMember = async () => {
-    if (!selectedEmployee || isAddingMember || !activeCluster) return;
+    if (selectedEmployees.length === 0 || isAddingMember || !activeCluster) return;
     setIsAddingMember(true);
     setMemberError("");
 
@@ -873,26 +873,35 @@ useEffect(() => {
         method: "POST",
         body: JSON.stringify({
           cluster_id: activeCluster.id,
-          employee_id: Number(selectedEmployee)
+          employee_ids: selectedEmployees.map(Number)
         })
       });
-      setMembers(prev => [...prev, added]);
-      setActiveMembers(prev => [...prev, added]);
+      const addedMembers = Array.isArray(added?.added) ? added.added : [];
+      const addedIds = new Set(addedMembers.map(member => Number(member.id)));
+
+      if (addedMembers.length > 0) {
+        setMembers(prev => [...prev, ...addedMembers]);
+        setActiveMembers(prev => [...prev, ...addedMembers]);
+      }
+
       setAvailableEmployees(prev =>
-        prev.filter(employee => employee.id !== added.id)
+        prev.filter(employee => !addedIds.has(Number(employee.id)))
       );
-      setSelectedEmployee("");
+      setSelectedEmployees([]);
       setEmployeeSearchQuery("");
       setShowMemberForm(false);
       setClusters(prev =>
         prev.map(cluster =>
           cluster.id === activeCluster.id
-            ? { ...cluster, members: Number(cluster.members ?? 0) + 1 }
+            ? {
+                ...cluster,
+                members: Number(cluster.members ?? 0) + (added?.added_count ?? 0)
+              }
             : cluster
         )
       );
     } catch (err) {
-      setMemberError(err?.error ?? "Unable to add member.");
+      setMemberError(err?.error ?? "Unable to add member(s).");
     } finally {
       setIsAddingMember(false);
     }
@@ -1286,7 +1295,7 @@ useEffect(() => {
                     onClick={() => setShowMemberForm(prev => !prev)}
                     disabled={employeeLoading || availableEmployees.length === 0}
                   >
-                    {showMemberForm ? "Hide add member form" : "+ Add Member"}
+                    {showMemberForm ? "Hide add member form" : "+ Add Members"}
                   </button>
                   {employeeLoading && (
                     <span className="modal-text">Loading employees...</span>
@@ -1303,9 +1312,9 @@ useEffect(() => {
                 {showMemberForm && availableEmployees.length > 0 && (
                  <div className="member-form manage-team-form-card">
                     <div className="member-form-head">
-                      <div className="member-form-title">Add a new member</div>
+                      <div className="member-form-title">Add new members</div>
                       <p className="member-form-subtitle">
-                        Search by name, pick the employee, then confirm to assign them.
+                        Search by name, select one or more employees, then confirm to assign them.
                       </p>
                     </div>
                     <div className="member-form-inputs">
@@ -1320,13 +1329,17 @@ useEffect(() => {
                         />
                       </label>
                       <label className="form-field">
-                        <span>Select employee</span>
+                        <span>Select employee(s)</span>
                         <select
                           className="member-select"
-                          value={selectedEmployee}
-                          onChange={event => setSelectedEmployee(event.target.value)}
+                          value={selectedEmployees}
+                          onChange={event =>
+                            setSelectedEmployees(
+                              Array.from(event.target.selectedOptions, option => option.value)
+                            )
+                          }
+                          multiple
                         >
-                          <option value="">Choose a member</option>
                           {filteredAvailableEmployees.map(employee => (
                             <option key={employee.id} value={employee.id}>
                               {employee.fullname}
@@ -1344,9 +1357,9 @@ useEffect(() => {
                       className="btn secondary member-form-submit"
                       type="button"
                       onClick={handleAddMember}
-                      disabled={!selectedEmployee || isAddingMember}
+                      disabled={selectedEmployees.length === 0 || isAddingMember}
                     >
-                      {isAddingMember ? "Adding..." : "Confirm member"}
+                      {isAddingMember ? "Adding..." : "Confirm members"}
                     </button>
                   </div>
                 )}

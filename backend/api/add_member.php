@@ -34,12 +34,21 @@ function getClusterMemberEmployeeReference(mysqli $conn): ?string {
 
 $data = json_decode(file_get_contents("php://input"), true) ?? [];
 $cluster_id = (int)($data['cluster_id'] ?? 0);
-$employee_id = (int)($data['employee_id'] ?? 0);
 $coachId = (int)($_SESSION['user']['id'] ?? 0);
 
-if ($cluster_id === 0 || $employee_id === 0) {
+$employeeIds = [];
+if (isset($data['employee_ids']) && is_array($data['employee_ids'])) {
+    $employeeIds = array_values(array_unique(array_filter(array_map('intval', $data['employee_ids']), fn($id) => $id > 0)));
+} elseif (isset($data['employee_id'])) {
+    $employeeId = (int)$data['employee_id'];
+    if ($employeeId > 0) {
+        $employeeIds = [$employeeId];
+    }
+}
+
+if ($cluster_id === 0 || count($employeeIds) === 0) {
     http_response_code(400);
-    exit(json_encode(["error" => "Missing cluster or employee."]));
+    exit(json_encode(["error" => "Missing cluster or employee(s)."]));
 }
 
 $clusterColumns = getColumns($conn, 'clusters');
@@ -63,80 +72,82 @@ if (!$clusterRes || $clusterRes->num_rows === 0) {
     exit(json_encode(["error" => "Not authorized to update this cluster."]));
 }
 
-$addedMember = null;
-
-if (
-    $clusterMemberEmployeeReference === 'employees'
-    && $employeeIdColumn
-    && $employeeUserIdColumn
-) {
-    $employeeStmt = $conn->prepare(
-        "SELECT e.$employeeIdColumn AS id,
-                " . (in_array('fullname', $userColumns, true)
-                    ? "u.fullname"
-                    : "TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name))") . " AS fullname
-         FROM employees e
-         JOIN users u ON u.$userIdColumn = e.$employeeUserIdColumn
-         WHERE e.$employeeIdColumn = ?"
-         . ($roleColumn ? " AND u.$roleColumn = 'employee'" : '') .
-         " LIMIT 1"
-    );
-    $employeeStmt->bind_param("i", $employee_id);
-    $employeeStmt->execute();
-    $employeeRes = $employeeStmt->get_result();
-
-    if (!$employeeRes || $employeeRes->num_rows === 0) {
-        http_response_code(404);
-        exit(json_encode(["error" => "Employee not found."]));
-    }
-
-    $addedMember = $employeeRes->fetch_assoc();
-} else {
-    $nameExpr = in_array('fullname', $userColumns, true)
-        ? 'u.fullname'
-        : "TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name))";
-
-    $employeeJoin = in_array('user_id', $employeeColumns, true)
-        ? "LEFT JOIN employees e ON e.user_id = u.$userIdColumn"
-        : '';
-
-    $employeeStmt = $conn->prepare(
-        "SELECT u.$userIdColumn AS id,
-                $nameExpr AS fullname
-         FROM users u
-         $employeeJoin
-         WHERE u.$userIdColumn = ?"
-         . ($roleColumn ? " AND u.$roleColumn = 'employee'" : '') .
-         " LIMIT 1"
-    );
-    $employeeStmt->bind_param("i", $employee_id);
-    $employeeStmt->execute();
-    $employeeRes = $employeeStmt->get_result();
-
-    if (!$employeeRes || $employeeRes->num_rows === 0) {
-        http_response_code(404);
-        exit(json_encode(["error" => "Employee not found."]));
-    }
-
-    $addedMember = $employeeRes->fetch_assoc();
-}
-
 $insertStmt = $conn->prepare(
     "INSERT IGNORE INTO cluster_members (cluster_id, employee_id)
      VALUES (?, ?)"
 );
+
+    $addedMembers = [];
+
+foreach ($employeeIds as $employee_id) {
+    $addedMember = null;
+
+    if (
+        $clusterMemberEmployeeReference === 'employees'
+        && $employeeIdColumn
+        && $employeeUserIdColumn
+    ) {
+        $employeeStmt = $conn->prepare(
+            "SELECT e.$employeeIdColumn AS id,
+                    " . (in_array('fullname', $userColumns, true)
+                        ? "u.fullname"
+                        : "TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name))") . " AS fullname
+            FROM employees e
+            JOIN users u ON u.$userIdColumn = e.$employeeUserIdColumn
+            WHERE e.$employeeIdColumn = ?"
+            . ($roleColumn ? " AND u.$roleColumn = 'employee'" : '') .
+            " LIMIT 1"
+        );
+    } else {
+        $nameExpr = in_array('fullname', $userColumns, true)
+            ? 'u.fullname'
+            : "TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name))";
+
+        $employeeJoin = in_array('user_id', $employeeColumns, true)
+            ? "LEFT JOIN employees e ON e.user_id = u.$userIdColumn"
+            : '';
+
+        $employeeStmt = $conn->prepare(
+            "SELECT u.$userIdColumn AS id,
+                    $nameExpr AS fullname
+            FROM users u
+            $employeeJoin
+            WHERE u.$userIdColumn = ?"
+            . ($roleColumn ? " AND u.$roleColumn = 'employee'" : '') .
+            " LIMIT 1"
+        );
+    }
+
+    $employeeStmt->bind_param("i", $employee_id);
+    $employeeStmt->execute();
+    $employeeRes = $employeeStmt->get_result();
+
+    if (!$employeeRes || $employeeRes->num_rows === 0) {
+        continue;
+    }
+
+    $addedMember = $employeeRes->fetch_assoc();
+
 $insertStmt->bind_param("ii", $cluster_id, $employee_id);
-$insertStmt->execute();
+    $insertStmt->execute();
 
 if ($insertStmt->errno) {
-    http_response_code(500);
-    exit(json_encode(["error" => "Unable to add member."]));
+        http_response_code(500);
+        exit(json_encode(["error" => "Unable to add member(s)."]));
+    }
+
+if ($insertStmt->affected_rows > 0) {
+        $addedMember['id'] = (int)$addedMember['id'];
+        $addedMember['fullname'] = trim((string)$addedMember['fullname']);
+        if ($addedMember['fullname'] === '') {
+            $addedMember['fullname'] = "Employee #{$addedMember['id']}";
+        }
+
+        $addedMembers[] = $addedMember;
+    }
 }
 
-i$addedMember['id'] = (int)$addedMember['id'];
-$addedMember['fullname'] = trim((string)$addedMember['fullname']);
-if ($addedMember['fullname'] === '') {
-    $addedMember['fullname'] = "Employee #{$addedMember['id']}";
-}
-
-echo json_encode($addedMember);
+echo json_encode([
+    "added" => $addedMembers,
+    "added_count" => count($addedMembers)
+]);
