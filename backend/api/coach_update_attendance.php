@@ -16,9 +16,42 @@ function getColumns(mysqli $conn, string $table): array {
 
 function mapTagToAttendanceStatus(?string $tag): string {
     $normalizedTag = strtolower(trim((string)$tag));
+    if ($normalizedTag === 'absent') return 'Absent';
     if ($normalizedTag === 'late') return 'Late';
+    if ($normalizedTag === 'on leave') return 'On Leave';
+    if ($normalizedTag === 'overtime') return 'Overtime';
     if ($normalizedTag === 'on time') return 'Present';
     return 'Present';
+}
+
+function getEnumValues(mysqli $conn, string $table, string $column): array {
+    $res = $conn->query("SHOW COLUMNS FROM $table LIKE '" . $conn->real_escape_string($column) . "'");
+    if (!$res || $res->num_rows === 0) return [];
+
+    $row = $res->fetch_assoc();
+    $type = $row['Type'] ?? '';
+    if (!preg_match('/^enum\((.*)\)$/i', $type, $matches)) return [];
+
+    $inner = $matches[1] ?? '';
+    if ($inner === '') return [];
+
+    $parts = str_getcsv($inner, ',', "'", '\\');
+    return array_values(array_filter(array_map(static fn($v) => trim((string)$v), $parts), static fn($v) => $v !== ''));
+}
+
+function normalizeToAllowedEnum(?string $value, array $allowedValues): ?string {
+    if ($value === null) return null;
+    $trimmed = trim($value);
+    if ($trimmed === '') return null;
+    if (count($allowedValues) === 0) return $trimmed;
+
+    $allowedMap = [];
+    foreach ($allowedValues as $allowedValue) {
+        $allowedMap[strtolower($allowedValue)] = $allowedValue;
+    }
+
+    $lookup = strtolower($trimmed);
+    return $allowedMap[$lookup] ?? null;
 }
 
 $data = json_decode(file_get_contents("php://input"), true);
@@ -187,7 +220,10 @@ if ($hasNewAttendance) {
         exit;
     }
 
-    $attendanceStatusEscaped = "'" . $conn->real_escape_string(mapTagToAttendanceStatus($tag)) . "'";
+    $attendanceStatusEnum = getEnumValues($conn, 'attendance_logs', 'attendance_status');
+    $mappedAttendanceStatus = mapTagToAttendanceStatus($tag);
+    $normalizedAttendanceStatus = normalizeToAllowedEnum($mappedAttendanceStatus, $attendanceStatusEnum) ?? 'Present';
+    $attendanceStatusEscaped = "'" . $conn->real_escape_string($normalizedAttendanceStatus) . "'";
 
     $updateAttendanceResult = $conn->query(
         "UPDATE attendance_logs
@@ -223,7 +259,14 @@ if ($hasNewAttendance) {
                 $timeLogUpdates[] = "time_out=$timeOutValue";
             }
             if ($hasTimeLogTag) {
-                $timeLogUpdates[] = "tag=$tagValue";
+                $timeLogTagEnum = getEnumValues($conn, 'time_logs', 'tag');
+                $normalizedTimeLogTag = normalizeToAllowedEnum($tag, $timeLogTagEnum);
+
+                if ($normalizedTimeLogTag !== null) {
+                    $timeLogUpdates[] = "tag='" . $conn->real_escape_string($normalizedTimeLogTag) . "'";
+                } else {
+                    $timeLogUpdates[] = "tag=NULL";
+                }
             }
 
             $updateTimeLogResult = $conn->query(
