@@ -424,7 +424,18 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="content content-muted">
-            {activeNav === "Dashboard" && <MainDashboard />}
+            {activeNav === "Dashboard" && (
+            <MainDashboard
+              attendanceControls={{
+                timeInAt: attendanceLog.timeInAt,
+                timeOutAt: attendanceLog.timeOutAt,
+                canClickTimeIn,
+                canClickTimeOut,
+                onTimeIn: handleTimeIn,
+                onTimeOut: handleTimeOut
+              }}
+            />
+          )}
 
           {data.length === 0 && activeNav !== "Attendance" && (
             <div className="empty-state">No team cluster details available.</div>
