@@ -198,9 +198,10 @@ export default function MainDashboard({
   }, [activeTimeIn, activeTimeOut, now]);
 
   const totalHours = useMemo(() => {
-    if (!activeTimeIn) return 0;
+    if (!activeTimeIn) return "0.0";
     const endTime = activeTimeOut ?? now;
-    return Math.floor((endTime.getTime() - activeTimeIn.getTime()) / (1000 * 60 * 60));
+    const elapsedHours = Math.max(0, (endTime.getTime() - activeTimeIn.getTime()) / (1000 * 60 * 60));
+    return elapsedHours.toFixed(1);
   }, [activeTimeIn, activeTimeOut, now]);
 
   const calendarData = useMemo(() => {
