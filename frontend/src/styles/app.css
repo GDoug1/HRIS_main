@@ -2146,6 +2146,7 @@ body {
   list-style: none;
 }
 
+
 .announcement-list {
   padding-right: 12px;
   margin-bottom: 0;
@@ -2470,6 +2471,8 @@ body {
   margin-bottom: 6px;
   font-weight: 500;
 }
+
+
 
 .member-line {
   font-size: 10px;
