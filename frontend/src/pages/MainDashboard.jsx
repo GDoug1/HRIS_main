@@ -16,8 +16,9 @@ function TimeCard({
   setAutoTimeOut,
   timeInputDisplay,
   counterDisplay,
-  timeInStart,
+  hasActiveTimeIn,
   onToggleTimeIn,
+  canToggleTimeIn,
 }) {
   return (
     <div className="card time-card">
@@ -37,8 +38,13 @@ function TimeCard({
         <div className="time-input">{timeInputDisplay}</div>
         <div className="time-counter">{counterDisplay}</div>
 
-        <button type="button" className="time-in-btn" onClick={onToggleTimeIn}>
-          {timeInStart ? "Time Out" : "Time In"}
+        <button
+          type="button"
+          className="time-in-btn"
+          onClick={onToggleTimeIn}
+          disabled={!canToggleTimeIn}
+        >
+          {hasActiveTimeIn ? "Time Out" : "Time In"}
         </button>
       </div>
     </div>
@@ -190,7 +196,7 @@ function MemberStatusCard({ memberStatuses, memberRequests, getStatusDotClass })
   );
 }
 
-export default function MainDashboard() {
+export default function MainDashboard({ attendanceControls = null }) {
   const [autoTimeOut, setAutoTimeOut] = useState(false);
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
@@ -200,19 +206,28 @@ export default function MainDashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  const activeTimeIn = attendanceControls?.timeInAt ?? timeInStart;
+  const activeTimeOut = attendanceControls?.timeOutAt ?? null;
+  const hasActiveTimeIn = Boolean(activeTimeIn && !activeTimeOut);
+  const canToggleTimeIn = attendanceControls
+    ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut)
+    : true;
+
   const counterDisplay = useMemo(() => {
-    if (!timeInStart) return "00:00:00";
-    const diffInSeconds = Math.max(0, Math.floor((now.getTime() - timeInStart.getTime()) / 1000));
+    if (!activeTimeIn) return "00:00:00";
+    const counterEndTime = activeTimeOut ?? now;
+    const diffInSeconds = Math.max(0, Math.floor((counterEndTime.getTime() - activeTimeIn.getTime()) / 1000));
     const hours = String(Math.floor(diffInSeconds / 3600)).padStart(2, "0");
     const minutes = String(Math.floor((diffInSeconds % 3600) / 60)).padStart(2, "0");
     const seconds = String(diffInSeconds % 60).padStart(2, "0");
     return `${hours}:${minutes}:${seconds}`;
-  }, [now, timeInStart]);
+  }, [activeTimeIn, activeTimeOut, now]);
 
   const totalHours = useMemo(() => {
-    if (!timeInStart) return 0;
-    return Math.floor((now.getTime() - timeInStart.getTime()) / (1000 * 60 * 60));
-  }, [now, timeInStart]);
+    if (!activeTimeIn) return 0;
+    const endTime = activeTimeOut ?? now;
+    return Math.floor((endTime.getTime() - activeTimeIn.getTime()) / (1000 * 60 * 60));
+  }, [activeTimeIn, activeTimeOut, now]);
 
   const calendarData = useMemo(() => {
     const currentDate = new Date();
@@ -260,6 +275,17 @@ export default function MainDashboard() {
     `member-status-dot ${status.toLowerCase().replace(/\s+/g, "-")}`;
 
   const onToggleTimeIn = () => {
+    if (attendanceControls) {
+      if (attendanceControls.canClickTimeOut) {
+        attendanceControls.onTimeOut();
+        return;
+      }
+      if (attendanceControls.canClickTimeIn) {
+        attendanceControls.onTimeIn();
+      }
+      return;
+    }
+
     setTimeInStart(prev => (prev ? null : new Date()));
   };
 
@@ -276,15 +302,16 @@ export default function MainDashboard() {
           setAutoTimeOut={setAutoTimeOut}
           timeInputDisplay={now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
           counterDisplay={counterDisplay}
-          timeInStart={timeInStart}
+          hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}
+          canToggleTimeIn={canToggleTimeIn}
         />
         <AnnouncementCard announcements={announcements} />
         <BreakCard />
         <ShiftCard />
         <CalendarCard calendarData={calendarData} />
         <HolidayCard holidayBirthdayItems={holidayBirthdayItems} />
-        <SummaryCard timeInStart={timeInStart} totalHours={totalHours} />
+        <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} />
         <MemberStatusCard
           memberStatuses={memberStatuses}
           memberRequests={memberRequests}
