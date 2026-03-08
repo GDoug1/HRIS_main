@@ -142,11 +142,11 @@ function SummaryCard({ timeInStart, totalHours }) {
       </div>
       <div>
         <div className="label">Total Hours</div>
-        <div className="big-value">{totalHours}h</div>
+        <div className="summary-hours-value">{totalHours}h</div>
       </div>
       <div>
         <div className="label">Attendance</div>
-        <div className="big-value">{timeInStart ? "Present" : "Absent"}</div>
+        <div className="summary-status-value">{timeInStart ? "Present" : "Absent"}</div>
       </div>
     </div>
   );
