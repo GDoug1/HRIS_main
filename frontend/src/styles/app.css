@@ -1949,6 +1949,20 @@ body {
   align-items: start;
 }
 
+.dashboard-grid.no-member-status {
+  grid-template-areas:
+    "time announcement announcement"
+    "shift calendar holiday"
+    "summary summary summary";
+}
+
+.dashboard-grid.has-member-status {
+  grid-template-areas:
+    "time announcement announcement"
+    "shift calendar holiday"
+    "summary summary member";
+}
+
 .dashboard-grid > .card {
   background: #d4d4d4;
   border: 1px solid #cecece;
@@ -2046,6 +2060,14 @@ body {
     column-gap: 8px;
     row-gap: 8px;
   }
+
+  .dashboard-grid.no-member-status {
+    grid-template-areas:
+      "time announcement"
+      "shift calendar"
+      "holiday holiday"
+      "summary summary";
+  }
 }
 
 @media (max-width: 980px) {
@@ -2072,6 +2094,16 @@ body {
     row-gap: 8px;
   }
 
+  .dashboard-grid.no-member-status {
+    grid-template-areas:
+      "time"
+      "announcement"
+      "shift"
+      "calendar"
+      "holiday"
+      "summary";
+  }
+  
   .card {
     padding: 10px;
   }

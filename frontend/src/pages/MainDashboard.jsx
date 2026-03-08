@@ -254,7 +254,7 @@ export default function MainDashboard({
         headerDate={now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
       />
 
-      <div className="dashboard-grid">
+      <div className={`dashboard-grid ${showMemberStatusCard ? "has-member-status" : "no-member-status"}`}>
         <TimeCard
           counterDisplay={counterDisplay}
           hasActiveTimeIn={hasActiveTimeIn}
