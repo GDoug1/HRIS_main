@@ -71,7 +71,10 @@ export default function CoachDashboard() {
   const [confirmState, setConfirmState] = useState(null);
   const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [coachAttendanceHistory, setCoachAttendanceHistory] = useState([]);
-  const [teamMemberAttendanceFilter, setTeamMemberAttendanceFilter] = useState("");
+  const [teamAttendanceSearchQuery, setTeamAttendanceSearchQuery] = useState("");
+  const [teamAttendanceDateFilter, setTeamAttendanceDateFilter] = useState("");
+  const [teamAttendanceSortOrder, setTeamAttendanceSortOrder] = useState("newest");
+  const [selectedTeamAttendanceMember, setSelectedTeamAttendanceMember] = useState(null);
   const [teamAttendanceDateStartFilter, setTeamAttendanceDateStartFilter] = useState("");
   const [teamAttendanceDateEndFilter, setTeamAttendanceDateEndFilter] = useState("");
   const [editingTeamAttendance, setEditingTeamAttendance] = useState(null);
@@ -232,6 +235,14 @@ export default function CoachDashboard() {
     const endTime = schedule.endTime ?? "5:00";
     const endPeriod = schedule.endPeriod ?? "PM";
     return `${startTime} ${startPeriod} - ${endTime} ${endPeriod}`;
+  };
+
+  const getScheduleLabel = schedule => {
+    if (!schedule || typeof schedule !== "object") return "Not scheduled today";
+    const daySchedules = schedule.daySchedules && typeof schedule.daySchedules === "object" ? schedule.daySchedules : null;
+    const preferredDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const firstAvailableDay = preferredDays.find(day => daySchedules?.[day]);
+    return firstAvailableDay ? formatTimeRange(daySchedules[firstAvailableDay]) : "Not scheduled today";
   };
 
   const toMinutes = (time, period) => {
@@ -490,16 +501,12 @@ useEffect(() => {
   }, [clusters]);
 
   useEffect(() => {
-    if (activeMembers.length === 0) {
-      setTeamMemberAttendanceFilter("");
-      return;
+    if (!selectedTeamAttendanceMember) return;
+    const memberStillExists = activeMembers.some(member => String(member.id) === String(selectedTeamAttendanceMember.id));
+    if (!memberStillExists) {
+      setSelectedTeamAttendanceMember(null);
     }
-
-    const hasSelectedMember = activeMembers.some(member => String(member.id) === String(teamMemberAttendanceFilter));
-    if (!hasSelectedMember) {
-      setTeamMemberAttendanceFilter(String(activeMembers[0].id));
-    }
-  }, [activeMembers, teamMemberAttendanceFilter]);
+  }, [activeMembers, selectedTeamAttendanceMember]);
 
   useEffect(() => {
     if (!activeCluster) return;
@@ -1104,34 +1111,90 @@ useEffect(() => {
     setConfirmState(null);
   };
 
-  const isMyAttendanceView = activeNav === "Attendance" || activeNav === "My Attendance";
   const isTeamClusterAttendanceView = activeNav === "Team Cluster Attendance";
   const isMyRequestsView = activeNav === "My Requests";
   const isFilingCenterView = activeNav === "My Filing Center";
   const attendanceViewTitle = activeNav === "Team Cluster Attendance" ? "Team Cluster Attendance" : "My Attendance";
-  const selectedTeamMember = activeMembers.find(member => String(member.id) === String(teamMemberAttendanceFilter)) ?? null;
-  const selectedTeamMemberHistoryEntries = (selectedTeamMember?.attendance_history ?? [])
+  const filteredTeamMemberHistoryEntries = (selectedTeamAttendanceMember?.attendance_history ?? [])
     .flatMap(month => month.entries ?? [])
     .sort((a, b) => {
       const left = parseSqlDateTime(a.time_in_at ?? a.time_out_at)?.getTime() ?? 0;
       const right = parseSqlDateTime(b.time_in_at ?? b.time_out_at)?.getTime() ?? 0;
       return right - left;
-    });
-  const filteredTeamMemberHistoryEntries = selectedTeamMemberHistoryEntries.filter(item => {
+    })
+    .filter(item => {
     const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at);
     if (!entryDate) return false;
     if (teamAttendanceDateStartFilter && entryDate < teamAttendanceDateStartFilter) return false;
     if (teamAttendanceDateEndFilter && entryDate > teamAttendanceDateEndFilter) return false;
     return true;
-  });
+    });
+
+  const teamAttendanceRows = useMemo(() => {
+    const normalizedQuery = teamAttendanceSearchQuery.trim().toLowerCase();
+    const selectedDate = teamAttendanceDateFilter;
+
+    const rows = activeMembers.map(member => {
+      const entries = (member.attendance_history ?? []).flatMap(month => month.entries ?? []);
+      const datedEntries = entries.filter(entry => {
+        if (!selectedDate) return true;
+        const entryDate = toDateInputValue(entry.time_in_at ?? entry.time_out_at);
+        return entryDate === selectedDate;
+      });
+      const sortedEntries = [...datedEntries].sort((a, b) => {
+        const left = parseSqlDateTime(a.time_in_at ?? a.time_out_at)?.getTime() ?? 0;
+        const right = parseSqlDateTime(b.time_in_at ?? b.time_out_at)?.getTime() ?? 0;
+        return right - left;
+      });
+      const latestEntry = sortedEntries[0] ?? null;
+
+      return {
+        member,
+        latestEntry,
+        entryCount: sortedEntries.length,
+        searchText: `${member.fullname} ${latestEntry?.tag ?? ""}`.toLowerCase()
+      };
+    });
+
+    const searchedRows = rows.filter(row => (normalizedQuery ? row.searchText.includes(normalizedQuery) : true));
+
+    return searchedRows.sort((left, right) => {
+      const leftTime = parseSqlDateTime(left.latestEntry?.time_in_at ?? left.latestEntry?.time_out_at)?.getTime() ?? 0;
+      const rightTime = parseSqlDateTime(right.latestEntry?.time_in_at ?? right.latestEntry?.time_out_at)?.getTime() ?? 0;
+      return teamAttendanceSortOrder === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+    });
+  }, [activeMembers, teamAttendanceDateFilter, teamAttendanceSearchQuery, teamAttendanceSortOrder]);
+
+  const teamAttendanceSummary = useMemo(() => {
+    const selectedDate = teamAttendanceDateFilter;
+    const entries = activeMembers.flatMap(member =>
+      (member.attendance_history ?? [])
+        .flatMap(month => month.entries ?? [])
+        .filter(entry => {
+          if (!selectedDate) return true;
+          const entryDate = toDateInputValue(entry.time_in_at ?? entry.time_out_at);
+          return entryDate === selectedDate;
+        })
+    );
+
+    const timedInCount = entries.filter(entry => entry.time_in_at).length;
+    const completedShiftCount = entries.filter(entry => entry.time_in_at && entry.time_out_at).length;
+
+    return {
+      employees: activeMembers.length,
+      timedIn: timedInCount,
+      completedShift: completedShiftCount
+    };
+  }, [activeMembers, teamAttendanceDateFilter]);
 
   const openTeamAttendanceEditModal = entry => {
-    if (!selectedTeamMember || !entry?.id) return;
+    if (!selectedTeamAttendanceMember || !entry?.id) return;
+    setSelectedTeamAttendanceMember(null);
     setTeamAttendanceEditError("");
     setEditingTeamAttendance({
       attendanceId: entry.id,
-      employeeId: selectedTeamMember.id,
-      employeeName: selectedTeamMember.fullname
+      employeeId: selectedTeamAttendanceMember.id,
+      employeeName: selectedTeamAttendanceMember.fullname
     });
     setTeamAttendanceEditForm({
       timeInAt: toDateTimeLocalValue(entry.time_in_at),
@@ -1230,56 +1293,73 @@ useEffect(() => {
                       <div className="empty-state">No active team members found for this cluster yet.</div>
                     ) : (
                       <>
+                        <div className="team-cluster-attendance-summary-grid">
+                          <article className="team-cluster-summary-card">
+                            <span>Employees</span>
+                            <strong>{teamAttendanceSummary.employees}</strong>
+                          </article>
+                          <article className="team-cluster-summary-card">
+                            <span>Timed In</span>
+                            <strong>{teamAttendanceSummary.timedIn}</strong>
+                          </article>
+                          <article className="team-cluster-summary-card">
+                            <span>Completed Shift</span>
+                            <strong>{teamAttendanceSummary.completedShift}</strong>
+                          </article>
+                        </div>
+
                         <div className="attendance-history-range-filter" role="group" aria-label="Filter team member attendance">
-                          <label className="attendance-history-filter" htmlFor="coach-team-member-filter">
-                            <span>Team Member</span>
-                            <select
-                              id="coach-team-member-filter"
-                              value={teamMemberAttendanceFilter}
-                              onChange={event => setTeamMemberAttendanceFilter(event.target.value)}
-                            >
-                              {activeMembers.map(member => (
-                                <option key={member.id} value={member.id}>{member.fullname}</option>
-                              ))}
+                          <label className="attendance-history-filter" htmlFor="coach-team-attendance-search-filter">
+                            <span>Search</span>
+                            <input
+                              id="coach-team-attendance-search-filter"
+                              type="text"
+                              placeholder="Search by name or attendance tag"
+                              value={teamAttendanceSearchQuery}
+                              onChange={event => setTeamAttendanceSearchQuery(event.target.value)}
+                            />
+                          </label>
+                          <label className="attendance-history-filter" htmlFor="coach-team-attendance-date-filter">
+                            <span>Date</span>
+                            <input
+                              id="coach-team-attendance-date-filter"
+                              type="date"
+                              value={teamAttendanceDateFilter}
+                              onChange={event => setTeamAttendanceDateFilter(event.target.value)}
+                            />
+                          </label>
+                          <label className="attendance-history-filter" htmlFor="coach-team-attendance-sort-filter">
+                            <span>Sort</span>
+                            <select id="coach-team-attendance-sort-filter" value={teamAttendanceSortOrder} onChange={event => setTeamAttendanceSortOrder(event.target.value)}>
+                              <option value="newest">Newest attendance first</option>
+                              <option value="oldest">Oldest attendance first</option>
                             </select>
-                          </label>
-                          <label className="attendance-history-filter" htmlFor="coach-attendance-history-date-filter-start">
-                            <span>From</span>
-                            <input
-                              id="coach-attendance-history-date-filter-start"
-                              type="date"
-                              value={teamAttendanceDateStartFilter}
-                              onChange={event => setTeamAttendanceDateStartFilter(event.target.value)}
-                            />
-                          </label>
-                          <label className="attendance-history-filter" htmlFor="coach-attendance-history-date-filter-end">
-                            <span>To</span>
-                            <input
-                              id="coach-attendance-history-date-filter-end"
-                              type="date"
-                              value={teamAttendanceDateEndFilter}
-                              onChange={event => setTeamAttendanceDateEndFilter(event.target.value)}
-                            />
                           </label>
                         </div>
 
-                        {filteredTeamMemberHistoryEntries.length > 0 ? (
+                        {teamAttendanceRows.length > 0 ? (
                           <div className="employee-attendance-history-table" role="table" aria-label="Team member attendance history">
                             <div className="employee-attendance-history-header" role="row">
-                              <span role="columnheader">Date</span>
+                              <span role="columnheader">Employee</span>
                               <span role="columnheader">Time In</span>
                               <span role="columnheader">Time Out</span>
                               <span role="columnheader">Tag</span>
-                              <span role="columnheader">Action</span>
                             </div>
-                            {filteredTeamMemberHistoryEntries.map(item => (
-                              <div key={`${selectedTeamMember?.id}-${item.id}`} className="employee-attendance-history-row" role="row">
-                                <span role="cell">{formatDateTimeLabel(item.time_in_at ?? item.time_out_at)}</span>
-                                <span role="cell">{formatDateTimeLabel(item.time_in_at)}</span>
-                                <span role="cell">{formatDateTimeLabel(item.time_out_at)}</span>
-                                <span role="cell">{item.tag ?? "Pending"}</span>
+                            {teamAttendanceRows.map(row => (
+                              <div
+                                key={row.member.id}
+                                className="employee-attendance-history-row employee-attendance-summary-row"
+                                role="row"
+                                onClick={() => setSelectedTeamAttendanceMember(row.member)}
+                              >
+                                <span role="cell" className="team-attendance-employee-cell">
+                                  <strong>{row.member.fullname}</strong>
+                                  <small>{getScheduleLabel(row.member.schedule)}</small>
+                                </span>
+                                <span role="cell">{formatDateTimeLabel(row.latestEntry?.time_in_at)}</span>
+                                <span role="cell">{formatDateTimeLabel(row.latestEntry?.time_out_at)}</span>
                                 <span role="cell">
-                                  <button className="btn" type="button" onClick={() => openTeamAttendanceEditModal(item)}>Edit</button>
+                                  <span className="attendance-subtag">{row.latestEntry?.tag ?? "Scheduled"}</span>
                                 </span>
                               </div>
                             ))}
@@ -1933,12 +2013,75 @@ useEffect(() => {
           </div>
         )}
 
+        {selectedTeamAttendanceMember && (
+          <div className="modal-overlay" role="dialog" aria-modal="true">
+            <div className="modal-card attendance-details-modal">
+              <div className="modal-header">
+                <div>
+                  <div className="modal-title">{selectedTeamAttendanceMember.fullname}</div>
+                  <div className="modal-subtitle">Attendance details</div>
+                </div>
+                <button className="btn link modal-close-btn" type="button" onClick={() => setSelectedTeamAttendanceMember(null)}>
+                  Close
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="attendance-history-range-filter" role="group" aria-label="Filter selected member attendance history">
+                  <label className="attendance-history-filter" htmlFor="coach-attendance-history-date-filter-start">
+                    <span>From</span>
+                    <input
+                      id="coach-attendance-history-date-filter-start"
+                      type="date"
+                      value={teamAttendanceDateStartFilter}
+                      onChange={event => setTeamAttendanceDateStartFilter(event.target.value)}
+                    />
+                  </label>
+                  <label className="attendance-history-filter" htmlFor="coach-attendance-history-date-filter-end">
+                    <span>To</span>
+                    <input
+                      id="coach-attendance-history-date-filter-end"
+                      type="date"
+                      value={teamAttendanceDateEndFilter}
+                      onChange={event => setTeamAttendanceDateEndFilter(event.target.value)}
+                    />
+                  </label>
+                </div>
+                {filteredTeamMemberHistoryEntries.length > 0 ? (
+                  <div className="employee-attendance-history-table" role="table" aria-label="Team member attendance detail history">
+                    <div className="employee-attendance-history-header" role="row">
+                      <span role="columnheader">Date</span>
+                      <span role="columnheader">Cluster</span>
+                      <span role="columnheader">Time In</span>
+                      <span role="columnheader">Time Out</span>
+                      <span role="columnheader">Tag</span>
+                    </div>
+                    {filteredTeamMemberHistoryEntries.map(item => (
+                      <div key={`${selectedTeamAttendanceMember.id}-${item.id}`} className="employee-attendance-history-row" role="row">
+                        <span role="cell">{formatDateTimeLabel(item.time_in_at ?? item.time_out_at)}</span>
+                        <span role="cell">{dashboardCluster?.name ?? "Cluster"}</span>
+                        <span role="cell">{formatDateTimeLabel(item.time_in_at)}</span>
+                        <span role="cell">{formatDateTimeLabel(item.time_out_at)}</span>
+                        <span role="cell" className="attendance-tag-cell">
+                          <span className="attendance-subtag">{item.tag ?? "Pending"}</span>
+                          <button className="btn" type="button" onClick={() => openTeamAttendanceEditModal(item)}>Edit</button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">No attendance records match the selected filters.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {editingTeamAttendance && (
           <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-card attendance-edit-modal">
               <div className="modal-header">
                 <div>
-                  <div className="modal-title">Edit Team Attendance</div>
+                  <div className="modal-title">Edit Attendance Entry</div>
                   <div className="modal-subtitle">{editingTeamAttendance.employeeName}</div>
                 </div>
                 <button className="btn link modal-close-btn" type="button" onClick={() => setEditingTeamAttendance(null)}>
