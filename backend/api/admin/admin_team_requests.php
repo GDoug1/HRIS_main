@@ -61,12 +61,14 @@ if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
 
 $employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
 $userJoinSql = '';
-if ($usersIdColumn !== null && $userDisplayColumn !== null) {
+if ($usersIdColumn !== null && ($userDisplayColumn !== null || $userRoleColumn !== null)) {
     if ($requestEmployeeReference === 'users') {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
-        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
     } else {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
+    }
+
+    if ($userDisplayColumn !== null) {
         $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
     }
 }
