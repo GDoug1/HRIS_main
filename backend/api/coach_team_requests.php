@@ -40,20 +40,39 @@ function getClusterMemberEmployeeReference(mysqli $conn): ?string {
 
 $coachId = (int)($_SESSION['user']['id'] ?? 0);
 $clusterColumns = getColumns($conn, 'clusters');
+$userColumns = hasTable($conn, 'users') ? getColumns($conn, 'users') : [];
+$employeeColumns = hasTable($conn, 'employees') ? getColumns($conn, 'employees') : [];
 $requestEmployeeReference = getClusterMemberEmployeeReference($conn);
 $clusterIdColumn = in_array('id', $clusterColumns, true) ? 'id' : 'cluster_id';
 $clusterOwnerColumn = in_array('coach_id', $clusterColumns, true) ? 'coach_id' : 'user_id';
 
-$requestEmployeeExpr = "req.employee_id";
-if ($requestEmployeeReference === 'users') {
-    $requestEmployeeExpr = "COALESCE(emp.employee_id, req.employee_id)";
+$usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : null);
+$userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : null);
+$canJoinEmployees = in_array('user_id', $employeeColumns, true) && in_array('employee_id', $employeeColumns, true);
+
+$requestEmployeeExpr = 'req.employee_id';
+$employeeJoinSql = '';
+if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
+    $requestEmployeeExpr = 'COALESCE(emp.employee_id, req.employee_id)';
+    $employeeJoinSql = ' LEFT JOIN employees emp ON emp.user_id = req.employee_id';
+}
+
+$employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
+$userJoinSql = '';
+if ($usersIdColumn !== null && $userDisplayColumn !== null) {
+    if ($requestEmployeeReference === 'users') {
+        $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
+        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
+    } else {
+        $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
+        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
+    }
 }
 
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, &$items) {
-    $sql = "SELECT
-                DISTINCT
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, &$items) {
+    $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
                 req.$typeColumn AS request_type,
@@ -61,13 +80,12 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 $scheduleExpr AS schedule_period,
                 req.status,
                 $requestEmployeeExpr AS employee_id,
-                COALESCE(ur.fullname, u.fullname, CONCAT('Employee #', $requestEmployeeExpr)) AS employee_name
+                $employeeNameExpr AS employee_name
             FROM $table req
-            LEFT JOIN employees emp ON emp.user_id = req.employee_id
+            $employeeJoinSql
             INNER JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
             INNER JOIN clusters c ON c.$clusterIdColumn = cm.cluster_id
-            LEFT JOIN users u ON u.id = req.employee_id
-            LEFT JOIN users ur ON ur.id = emp.user_id
+            $userJoinSql
             WHERE c.$clusterOwnerColumn = ?
               AND c.status = 'active'";
 
