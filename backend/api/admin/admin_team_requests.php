@@ -85,10 +85,10 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             FROM $table req
             $employeeJoinSql
             LEFT JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
-            INNER JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
+            LEFT JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
+                AND c.status = 'active'
             $userJoinSql
-            WHERE c.status = 'active'
-              AND LOWER(COALESCE(req.status, '')) = 'endorsed'";
+            WHERE LOWER(COALESCE(req.status, '')) = 'endorsed'";
 
     $res = $conn->query($sql);
     if (!$res) {
