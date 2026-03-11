@@ -1477,7 +1477,7 @@ export default function CoachDashboard() {
                       {isTeamClusterAttendanceView
                         ? "Review and edit your team members' attendance history."
                         : isTeamRequestView
-                          ? "Review filing requests from your team and approve or reject them."
+                          ? "Review filing requests from your team and endorse or reject them before admin review."
                           : "Attendance is now part of the Coach Dashboard."}
                     </p>
                   </div>

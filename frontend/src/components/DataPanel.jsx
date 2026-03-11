@@ -187,15 +187,15 @@ export default function DataPanel({
                   <button
                     className="btn"
                     type="button"
-                    disabled={requestActionLoadingId === item.id || String(item.status ?? "").toLowerCase().includes("approve")}
+                    disabled={requestActionLoadingId === item.id || !String(item.status ?? "").toLowerCase().includes("pending")}
                     onClick={() => onRequestAction(item, "Approved")}
                   >
-                    {requestActionLoadingId === item.id ? "Saving..." : "Accept"}
+                    {requestActionLoadingId === item.id ? "Saving..." : "Endorse"}
                   </button>
                   <button
                     className="btn secondary"
                     type="button"
-                    disabled={requestActionLoadingId === item.id || String(item.status ?? "").toLowerCase().includes("reject")}
+                    disabled={requestActionLoadingId === item.id || !String(item.status ?? "").toLowerCase().includes("pending")}
                     onClick={() => onRequestAction(item, "Rejected")}
                   >
                     Reject

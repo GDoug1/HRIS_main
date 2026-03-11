@@ -49,7 +49,11 @@ $source = trim((string)($body['request_source'] ?? ''));
 $requestId = (int)($body['request_id'] ?? 0);
 $status = trim((string)($body['status'] ?? ''));
 
-if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || !in_array($status, ['Approved', 'Rejected'], true)) {
+if ($status === 'Approved') {
+    $status = 'Endorsed';
+}
+
+if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || !in_array($status, ['Endorsed', 'Rejected'], true)) {
     http_response_code(422);
     echo json_encode(["error" => "Invalid request update payload."]);
     exit;
