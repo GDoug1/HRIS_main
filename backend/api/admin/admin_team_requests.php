@@ -76,7 +76,7 @@ if ($usersIdColumn !== null && ($userDisplayColumn !== null || $userRoleColumn !
 $items = [];
 
 $requesterUserExpr = $requestEmployeeExpr;
-if ($canJoinEmployees) {
+if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
     $requesterUserExpr = "COALESCE(emp.user_id, $requestEmployeeExpr)";
 }
 
