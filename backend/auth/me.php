@@ -13,8 +13,18 @@ if (!$user) {
 $permissionNames = [];
 $userId = isset($user["id"]) ? (int)$user["id"] : 0;
 $roleId = isset($user["role_id"]) ? (int)$user["role_id"] : 0;
+$roleName = strtolower(trim((string)($user["role"] ?? "")));
 
-if ($userId > 0 && $roleId > 0) {
+if ($roleName === "super admin") {
+    $allPermissionsResult = $conn->query("SELECT permission_name FROM permissions ORDER BY permission_id");
+    if ($allPermissionsResult) {
+        while ($row = $allPermissionsResult->fetch_assoc()) {
+            if (!empty($row["permission_name"])) {
+                $permissionNames[] = $row["permission_name"];
+            }
+        }
+    }
+} elseif ($userId > 0 && $roleId > 0) {
     $permissionStmt = $conn->prepare(
         "SELECT p.permission_name,
                 CASE
