@@ -2614,7 +2614,63 @@ body {
 .permission-edit-btn {
   margin-top: 14px;
   font-size: 13px;
-  padding: 6px 12px;
+  padding: 8px 14px;
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.permission-edit-btn:hover {
+  background: #1e40af;
+}
+
+.permission-modal {
+  width: min(620px, 94vw);
+  max-height: min(82vh, 760px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 18px;
+}
+
+.permission-modal-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.permission-modal-list {
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.permission-modal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.permission-modal-item input {
+  width: 18px;
+  height: 18px;
+}
+
+.permission-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.permission-save-btn {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #ffffff;
 }
 
 @media (max-width: 900px) {

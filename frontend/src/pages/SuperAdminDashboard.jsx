@@ -98,21 +98,24 @@ export default function SuperAdminDashboard() {
     { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
   ];
   const controlPanelTabs = ["General", "Search", "Logs", "User Archives"];
-  const rolePermissionCards = [
+  const allRolePermissions = [
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee",
+    "Set Attendance",
+    "Edit Attendance",
+    "View Dashboard",
+    "View Team",
+    "View Attendance",
+    "View Employee List",
+    "Edit Profile",
+    "Access Control Panel"
+  ];
+  const initialRolePermissionCards = [
     {
       role: "Super Admin",
       permissions: [
-        "Add Employee",
-        "Edit Employee",
-        "Delete Employee",
-        "Set Attendance",
-        "Edit Attendance",
-        "View Dashboard",
-        "View Team",
-        "View Attendance",
-        "View Employee List",
-        "Edit Profile",
-        "Access Control Panel"
+        ...allRolePermissions
       ]
     },
     {
@@ -139,6 +142,42 @@ export default function SuperAdminDashboard() {
       permissions: ["View Dashboard", "View Team", "View Attendance"]
     }
   ];
+  const [rolePermissionCards, setRolePermissionCards] = useState(initialRolePermissionCards);
+  const [editingPermissionRole, setEditingPermissionRole] = useState(null);
+  const [permissionSelection, setPermissionSelection] = useState([]);
+
+  const closePermissionEditor = () => {
+    setEditingPermissionRole(null);
+    setPermissionSelection([]);
+  };
+
+  const openPermissionEditor = card => {
+    setEditingPermissionRole(card.role);
+    setPermissionSelection(card.permissions);
+  };
+
+  const togglePermissionSelection = permission => {
+    setPermissionSelection(previousPermissions =>
+      previousPermissions.includes(permission)
+        ? previousPermissions.filter(item => item !== permission)
+        : [...previousPermissions, permission]
+    );
+  };
+
+  const savePermissionSelection = () => {
+    if (!editingPermissionRole) return;
+    setRolePermissionCards(previousCards =>
+      previousCards.map(card =>
+        card.role === editingPermissionRole
+          ? {
+              ...card,
+              permissions: allRolePermissions.filter(permission => permissionSelection.includes(permission))
+            }
+          : card
+      )
+    );
+    closePermissionEditor();
+  };
 
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
@@ -728,11 +767,51 @@ const handleOpenRejectModal = cluster => {
                         <li key={`${card.role}-${permission}`}>{permission}</li>
                       ))}
                     </ul>
-                    <button type="button" className="btn primary permission-edit-btn">Edit Permissions</button>
+                    <button
+                      type="button"
+                      className="btn permission-edit-btn"
+                      onClick={() => openPermissionEditor(card)}
+                    >
+                      Edit Permissions
+                    </button>
                   </div>
                 </article>
               ))}
             </div>
+
+            {editingPermissionRole && (
+              <div className="modal-overlay" role="presentation" onClick={closePermissionEditor}>
+                <div
+                  className="modal-card permission-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label={`Edit ${editingPermissionRole} permissions`}
+                  onClick={event => event.stopPropagation()}
+                >
+                  <h3 className="permission-modal-title">{editingPermissionRole}</h3>
+                  <div className="permission-modal-list" role="group" aria-label={`${editingPermissionRole} permissions`}>
+                    {allRolePermissions.map(permission => (
+                      <label key={`permission-toggle-${editingPermissionRole}-${permission}`} className="permission-modal-item">
+                        <input
+                          type="checkbox"
+                          checked={permissionSelection.includes(permission)}
+                          onChange={() => togglePermissionSelection(permission)}
+                        />
+                        <span>{permission}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="permission-modal-actions">
+                    <button type="button" className="btn secondary" onClick={closePermissionEditor}>
+                      Cancel
+                    </button>
+                    <button type="button" className="btn permission-save-btn" onClick={savePermissionSelection}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         ) : (
           <section className="content">
