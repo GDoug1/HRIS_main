@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 04, 2026 at 07:49 AM
+-- Generation Time: Mar 12, 2026 at 07:29 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -115,6 +115,13 @@ CREATE TABLE `clusters` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `clusters`
+--
+
+INSERT INTO `clusters` (`cluster_id`, `name`, `description`, `user_id`, `status`, `rejection_reason`, `created_at`) VALUES
+(1, 'Team 1', 'team 1', 4, 'active', NULL, '2026-03-12 04:31:49');
+
 -- --------------------------------------------------------
 
 --
@@ -126,6 +133,13 @@ CREATE TABLE `cluster_members` (
   `employee_id` int(11) NOT NULL,
   `assigned_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `cluster_members`
+--
+
+INSERT INTO `cluster_members` (`cluster_id`, `employee_id`, `assigned_at`) VALUES
+(1, 2, '2026-03-12 04:32:12');
 
 -- --------------------------------------------------------
 
@@ -154,6 +168,17 @@ CREATE TABLE `employees` (
   `date_hired` date DEFAULT NULL,
   `archived` tinyint(1) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `employees`
+--
+
+INSERT INTO `employees` (`employee_id`, `user_id`, `permission_id`, `first_name`, `middle_name`, `last_name`, `address`, `birthdate`, `civil_status`, `email`, `personal_email`, `position`, `account`, `cluster_id`, `contact_number`, `employment_status`, `employee_type`, `date_hired`, `archived`) VALUES
+(1, 1, NULL, 'admin', NULL, NULL, NULL, NULL, NULL, 'admin@mail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(2, 2, NULL, 'employee1', NULL, NULL, NULL, NULL, NULL, 'employee1@mail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(3, 3, NULL, 'employee2', NULL, NULL, NULL, NULL, NULL, 'employee2@mail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(4, 4, NULL, 'teamcoach', NULL, NULL, NULL, NULL, NULL, 'teamcoach@mail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(5, 5, NULL, 'superadmin', NULL, NULL, NULL, NULL, NULL, 'superadmin@mail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -213,13 +238,30 @@ CREATE TABLE `overtime_requests` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `permission`
+-- Table structure for table `permissions`
 --
 
-CREATE TABLE `permission` (
+CREATE TABLE `permissions` (
   `permission_id` int(11) NOT NULL,
   `permission_name` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `permissions`
+--
+
+INSERT INTO `permissions` (`permission_id`, `permission_name`) VALUES
+(1, 'Add Employee'),
+(2, 'Edit Employee'),
+(3, 'Delete Employee'),
+(4, 'Set Attendance'),
+(5, 'Edit Attendance'),
+(6, 'View Dashboard'),
+(7, 'View Team'),
+(8, 'View Attendance'),
+(9, 'View Employee List'),
+(10, 'Edit Profile'),
+(11, 'Access Control Panel');
 
 -- --------------------------------------------------------
 
@@ -233,16 +275,61 @@ CREATE TABLE `roles` (
   `role_description` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`role_id`, `role_name`, `role_description`) VALUES
+(1, 'Super Admin', 'System-wide super administrator'),
+(2, 'Admin', 'Administrator role'),
+(3, 'Team Coach', 'Team coach role'),
+(4, 'Employee', 'Standard employee role');
+
 -- --------------------------------------------------------
 
 --
--- Table structure for table `role_permission`
+-- Table structure for table `role_permissions`
 --
 
-CREATE TABLE `role_permission` (
+CREATE TABLE `role_permissions` (
   `role_id` int(11) NOT NULL,
   `permission_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `role_permissions`
+--
+
+INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
+(1, 1),
+(1, 2),
+(1, 3),
+(1, 4),
+(1, 5),
+(1, 6),
+(1, 7),
+(1, 8),
+(1, 9),
+(1, 10),
+(1, 11),
+(2, 1),
+(2, 2),
+(2, 3),
+(2, 4),
+(2, 5),
+(2, 6),
+(2, 7),
+(2, 8),
+(2, 9),
+(2, 10),
+(3, 5),
+(3, 6),
+(3, 7),
+(3, 8),
+(3, 9),
+(4, 6),
+(4, 7),
+(4, 8);
 
 -- --------------------------------------------------------
 
@@ -262,6 +349,17 @@ CREATE TABLE `schedules` (
   `breaksched_start` datetime DEFAULT NULL,
   `breaksched_end` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `schedules`
+--
+
+INSERT INTO `schedules` (`schedule_id`, `cluster_id`, `employee_id`, `day_of_week`, `shift_type`, `start_time`, `end_time`, `work_setup`, `breaksched_start`, `breaksched_end`) VALUES
+(1, 1, 2, 'Monday', 'Morning', '09:00:00', '18:00:00', 'Onsite', '2000-01-01 15:00:00', '2000-01-01 15:30:00'),
+(2, 1, 2, 'Tuesday', 'Morning', '09:00:00', '18:00:00', 'Onsite', '2000-01-01 15:00:00', '2000-01-01 15:30:00'),
+(3, 1, 2, 'Wednesday', 'Morning', '09:00:00', '18:00:00', 'Onsite', '2000-01-01 15:00:00', '2000-01-01 15:30:00'),
+(4, 1, 2, 'Thursday', 'Morning', '09:00:00', '18:00:00', 'Onsite', '2000-01-01 15:00:00', '2000-01-01 15:30:00'),
+(5, 1, 2, 'Friday', 'Morning', '09:00:00', '18:00:00', 'Onsite', '2000-01-01 15:00:00', '2000-01-01 15:30:00');
 
 -- --------------------------------------------------------
 
@@ -297,6 +395,17 @@ CREATE TABLE `users` (
   `created_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`user_id`, `email`, `password`, `role_id`, `created_at`) VALUES
+(1, 'admin@mail.com', '$2y$10$G0qtvS.0rYfxSsoJ2xe5V.2p908qzKeyR0qGrpBsdT5WKteyiFYyu', 2, '2026-03-12 12:30:37'),
+(2, 'employee1@mail.com', '$2y$10$HihsMObCq5kTRn82H9zMy.VPYkmusyui8FUXb1eLcyyiaVYJEDEbG', 4, '2026-03-12 12:30:53'),
+(3, 'employee2@mail.com', '$2y$10$ZjZ1ITpHrnWwTyaqhUUGq.2LPv4nuweE8PtHo9/TW8qUHtb9EEkfO', 4, '2026-03-12 12:31:02'),
+(4, 'teamcoach@mail.com', '$2y$10$ue0g1ssRSbj.5owx93p1ZugfJRQvP/D30IOZgerLKkwrjKLFYNFNi', 3, '2026-03-12 12:31:11'),
+(5, 'superadmin@mail.com', '$2y$10$OBqptfoQCjK5.Mo9g7JoyuE0TCwQi227inQ79Ef/SbXwJm2dBENxi', 1, '2026-03-12 12:55:42');
+
 -- --------------------------------------------------------
 
 --
@@ -304,11 +413,18 @@ CREATE TABLE `users` (
 --
 
 CREATE TABLE `user_permissions` (
-  `id` int(11) NOT NULL,
+  `Id` int(11) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
   `permission_id` int(11) DEFAULT NULL,
   `is_allowed` tinyint(1) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_permissions`
+--
+
+INSERT INTO `user_permissions` (`Id`, `user_id`, `permission_id`, `is_allowed`) VALUES
+(1, 1, 11, 1);
 
 --
 -- Indexes for dumped tables
@@ -398,9 +514,9 @@ ALTER TABLE `overtime_requests`
   ADD KEY `approved_by` (`approved_by`);
 
 --
--- Indexes for table `permission`
+-- Indexes for table `permissions`
 --
-ALTER TABLE `permission`
+ALTER TABLE `permissions`
   ADD PRIMARY KEY (`permission_id`);
 
 --
@@ -410,9 +526,9 @@ ALTER TABLE `roles`
   ADD PRIMARY KEY (`role_id`);
 
 --
--- Indexes for table `role_permission`
+-- Indexes for table `role_permissions`
 --
-ALTER TABLE `role_permission`
+ALTER TABLE `role_permissions`
   ADD PRIMARY KEY (`role_id`,`permission_id`),
   ADD KEY `permission_id` (`permission_id`);
 
@@ -486,13 +602,13 @@ ALTER TABLE `break_logs`
 -- AUTO_INCREMENT for table `clusters`
 --
 ALTER TABLE `clusters`
-  MODIFY `cluster_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `cluster_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `employees`
 --
 ALTER TABLE `employees`
-  MODIFY `employee_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `employee_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `holidays`
@@ -513,22 +629,22 @@ ALTER TABLE `overtime_requests`
   MODIFY `ot_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `permission`
+-- AUTO_INCREMENT for table `permissions`
 --
-ALTER TABLE `permission`
-  MODIFY `permission_id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `permissions`
+  MODIFY `permission_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `role_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `role_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `schedules`
 --
 ALTER TABLE `schedules`
-  MODIFY `schedule_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `schedule_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `time_logs`
@@ -540,13 +656,13 @@ ALTER TABLE `time_logs`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `user_permissions`
 --
 ALTER TABLE `user_permissions`
-  MODIFY `Id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `Id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- Constraints for dumped tables
@@ -603,7 +719,7 @@ ALTER TABLE `cluster_members`
 --
 ALTER TABLE `employees`
   ADD CONSTRAINT `employees_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
-  ADD CONSTRAINT `employees_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permission` (`permission_id`);
+  ADD CONSTRAINT `employees_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`);
 
 --
 -- Constraints for table `leave_requests`
@@ -621,11 +737,11 @@ ALTER TABLE `overtime_requests`
   ADD CONSTRAINT `overtime_requests_ibfk_2` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`);
 
 --
--- Constraints for table `role_permission`
+-- Constraints for table `role_permissions`
 --
-ALTER TABLE `role_permission`
-  ADD CONSTRAINT `role_permission_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`),
-  ADD CONSTRAINT `role_permission_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permission` (`permission_id`);
+ALTER TABLE `role_permissions`
+  ADD CONSTRAINT `role_permissions_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`),
+  ADD CONSTRAINT `role_permissions_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`);
 
 --
 -- Constraints for table `schedules`
@@ -652,7 +768,7 @@ ALTER TABLE `users`
 --
 ALTER TABLE `user_permissions`
   ADD CONSTRAINT `user_permissions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
-  ADD CONSTRAINT `user_permissions_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permission` (`permission_id`);
+  ADD CONSTRAINT `user_permissions_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
