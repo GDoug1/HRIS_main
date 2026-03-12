@@ -44,6 +44,8 @@ const GENERAL_ROLE_LAYOUT = [
   }
 ];
 
+const normalizeRoleName = roleName => roleName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 export default function ControlPanelSection() {
   const [activeTab, setActiveTab] = useState("General");
   const [roles, setRoles] = useState([]);
@@ -57,6 +59,7 @@ export default function ControlPanelSection() {
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
+  const [roleSaveError, setRoleSaveError] = useState("");
 
   const loadRoles = async () => {
     const response = await apiFetch("api/control_panel/get_roles_with_permissions.php");
@@ -100,23 +103,39 @@ export default function ControlPanelSection() {
   );
 
   const allPermissions = useMemo(
-    () => [...new Set(GENERAL_ROLE_LAYOUT.flatMap(role => role.permissions))],
-    []
-  );
-
-  const generalRoles = useMemo(
     () =>
-      GENERAL_ROLE_LAYOUT.map(layoutRole => {
-        const roleFromApi = roles.find(role => role.role_name === layoutRole.role_name);
-        return {
-          ...layoutRole,
-          role_id: roleFromApi?.role_id
-        };
-      }),
+      [
+        ...new Set([
+          ...GENERAL_ROLE_LAYOUT.flatMap(role => role.permissions),
+          ...roles.flatMap(role => (Array.isArray(role.permissions) ? role.permissions : []))
+        ])
+      ],
     [roles]
   );
 
+  const generalRoles = useMemo(() => {
+    const defaultPermissionsByRole = new Map(
+      GENERAL_ROLE_LAYOUT.map(role => [normalizeRoleName(role.role_name), role.permissions])
+    );
+
+    const apiRoles = roles.map(role => ({
+      ...role,
+      permissions:
+        Array.isArray(role.permissions) && role.permissions.length > 0
+          ? role.permissions
+          : defaultPermissionsByRole.get(normalizeRoleName(role.role_name)) ?? []
+    }));
+
+    if (apiRoles.length > 0) return apiRoles;
+
+    return GENERAL_ROLE_LAYOUT.map(layoutRole => ({
+      ...layoutRole,
+      role_id: undefined
+    }));
+  }, [roles]);
+
   const openRoleEditor = role => {
+    setRoleSaveError("");
     setSelectedRole(role);
     setTempPermissions(Array.isArray(role.permissions) ? [...role.permissions] : []);
   };
@@ -128,18 +147,32 @@ export default function ControlPanelSection() {
   };
 
   const saveRolePermissions = async () => {
-    if (!selectedRole || typeof selectedRole.role_id === "undefined") return;
+    if (!selectedRole || typeof selectedRole.role_id === "undefined") {
+      setRoleSaveError("Unable to save role permissions because this role has no role id.");
+      return;
+    }
 
-    await apiFetch("api/control_panel/update_role_permissions.php", {
-      method: "POST",
-      body: JSON.stringify({
-        role_id: selectedRole.role_id,
-        permissions: tempPermissions
-      })
-    });
+    setRoleSaveError("");
 
-    setSelectedRole(null);
-    await Promise.all([loadRoles(), loadUsers()]);
+    try {
+      const response = await apiFetch("api/control_panel/update_role_permissions.php", {
+        method: "POST",
+        body: JSON.stringify({
+          role_id: selectedRole.role_id,
+          permissions: tempPermissions
+        })
+      });
+
+      if (!response.success) {
+        setRoleSaveError(response.message ?? "Failed to save permissions.");
+        return;
+      }
+
+      setSelectedRole(null);
+      await Promise.all([loadRoles(), loadUsers()]);
+    } catch (error) {
+      setRoleSaveError(error?.message ?? "Failed to save permissions.");
+    }
   };
 
   const openUserPermissions = async user => {
@@ -366,6 +399,8 @@ export default function ControlPanelSection() {
                 </label>
               ))}
             </div>
+            {roleSaveError && <p className="control-panel-modal-error" role="alert">{roleSaveError}</p>}
+
             <div className="control-panel-modal-actions">
               <button type="button" className="control-panel-cancel-btn" onClick={() => setSelectedRole(null)}>
                 Cancel
