@@ -97,6 +97,48 @@ export default function SuperAdminDashboard() {
     { label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") },
     { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
   ];
+  const controlPanelTabs = ["General", "Search", "Logs", "User Archives"];
+  const rolePermissionCards = [
+    {
+      role: "Super Admin",
+      permissions: [
+        "Add Employee",
+        "Edit Employee",
+        "Delete Employee",
+        "Set Attendance",
+        "Edit Attendance",
+        "View Dashboard",
+        "View Team",
+        "View Attendance",
+        "View Employee List",
+        "Edit Profile",
+        "Access Control Panel"
+      ]
+    },
+    {
+      role: "Admin",
+      permissions: [
+        "Add Employee",
+        "Edit Employee",
+        "Delete Employee",
+        "Set Attendance",
+        "Edit Attendance",
+        "View Dashboard",
+        "View Team",
+        "View Attendance",
+        "View Employee List",
+        "Edit Profile"
+      ]
+    },
+    {
+      role: "Team Coach",
+      permissions: ["Edit Attendance", "View Dashboard", "View Team", "View Attendance", "View Employee List"]
+    },
+    {
+      role: "Employee",
+      permissions: ["View Dashboard", "View Team", "View Attendance"]
+    }
+  ];
 
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
@@ -653,6 +695,44 @@ const handleOpenRejectModal = cluster => {
                 { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["endorsed"] }
               ]}
             />
+          </section>
+          ) : activeNav === "Control Panel" ? (
+          <section className="content control-panel-content">
+            <div className="control-panel-header">
+              <h2>Control Panel</h2>
+              <p>Manage role-based permissions</p>
+            </div>
+
+            <div className="control-panel-tabs" role="tablist" aria-label="Control panel tabs">
+              {controlPanelTabs.map(tab => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "General"}
+                  className={`control-panel-tab ${tab === "General" ? "active" : ""}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            <div className="permission-card-grid">
+              {rolePermissionCards.map(card => (
+                <article key={card.role} className="permission-card">
+                  <header className="permission-card-header">{card.role}</header>
+                  <div className="permission-card-body">
+                    <p className="permission-card-label">Permissions:</p>
+                    <ul>
+                      {card.permissions.map(permission => (
+                        <li key={`${card.role}-${permission}`}>{permission}</li>
+                      ))}
+                    </ul>
+                    <button type="button" className="btn primary permission-edit-btn">Edit Permissions</button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
         ) : (
           <section className="content">

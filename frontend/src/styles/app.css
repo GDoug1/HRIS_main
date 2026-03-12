@@ -2538,3 +2538,87 @@ body {
     font-size: 20px;
   }
 }
+.control-panel-content {
+  display: grid;
+  gap: 16px;
+}
+
+.control-panel-header h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.control-panel-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+}
+
+.control-panel-tabs {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.control-panel-tab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #111827;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: default;
+}
+
+.control-panel-tab.active {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.permission-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.permission-card {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.permission-card-header {
+  background: #2f8ccc;
+  color: #fff;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.permission-card-body {
+  padding: 14px 18px 16px;
+}
+
+.permission-card-label {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.permission-card-body ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.permission-edit-btn {
+  margin-top: 14px;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+@media (max-width: 900px) {
+  .permission-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
