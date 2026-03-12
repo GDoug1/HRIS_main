@@ -5,8 +5,7 @@ header("Content-Type: application/json");
 
 session_start();
 
-$roleName = strtolower(str_replace(' ', '', $_SESSION['role_name'] ?? ''));
-if ($roleName !== 'superadmin') {
+if (!isset($_SESSION['role_name']) || $_SESSION['role_name'] !== 'Superadmin') {
     http_response_code(403);
     echo json_encode([
         "success" => false,

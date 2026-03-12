@@ -1,15 +1,12 @@
 <?php
 
-if (!function_exists('logAction')) {
-    function logAction(mysqli $conn, int $userId, string $action, string $target): void
-    {
-        $stmt = $conn->prepare('INSERT INTO activity_logs (user_id, action, target) VALUES (?, ?, ?)');
-        if (!$stmt) {
-            return;
-        }
+function logAction($conn, $user_id, $action, $target = null) {
 
-        $stmt->bind_param('iss', $userId, $action, $target);
-        $stmt->execute();
-        $stmt->close();
-    }
+    $stmt = $conn->prepare("
+        INSERT INTO activity_logs (user_id, action, target)
+        VALUES (?, ?, ?)
+    ");
+
+    $stmt->bind_param("iss", $user_id, $action, $target);
+    $stmt->execute();
 }

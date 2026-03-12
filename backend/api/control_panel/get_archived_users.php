@@ -3,8 +3,7 @@
 require_once "../cors.php";
 session_start();
 
-$roleName = strtolower(str_replace(' ', '', $_SESSION['role_name'] ?? ''));
-if ($roleName !== 'superadmin') {
+if ($_SESSION['role_name'] !== 'Superadmin') {
     http_response_code(403);
     exit();
 }
