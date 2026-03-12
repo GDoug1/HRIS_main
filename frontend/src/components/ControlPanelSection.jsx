@@ -100,8 +100,8 @@ export default function ControlPanelSection() {
   );
 
   const allPermissions = useMemo(
-    () => [...new Set(roles.flatMap(role => (Array.isArray(role.permissions) ? role.permissions : [])))],
-    [roles]
+    () => [...new Set(GENERAL_ROLE_LAYOUT.flatMap(role => role.permissions))],
+    []
   );
 
   const generalRoles = useMemo(
