@@ -402,17 +402,25 @@ export default function SuperAdminDashboard() {
     setIsAddingEmployee(true);
     setAddEmployeeError("");
     try {
-      await apiFetch("api/admin/employee_management.php", {
+      const response = await apiFetch("api/admin/employee_management.php", {
         method: "POST",
         body: JSON.stringify({
           ...addEmployeeForm,
+          email: addEmployeeForm.work_email,
           employment_status: addEmployeeForm.employment_status || "Active"
         })
       });
+
+      const generatedEmail = response?.generated_account?.email;
+      const generatedPassword = response?.generated_account?.password;
+      if (generatedEmail && generatedPassword) {
+        window.alert(`Employee created.\nEmail: ${generatedEmail}\nPassword: ${generatedPassword}`);
+      }
+
       handleCloseAddEmployeeModal();
       await fetchEmployees();
     } catch (error) {
-      setAddEmployeeError(error?.error ?? "Unable to add employee.");
+      setAddEmployeeError(error?.error ?? error?.message ?? "Unable to add employee.");
     } finally {
       setIsAddingEmployee(false);
     }

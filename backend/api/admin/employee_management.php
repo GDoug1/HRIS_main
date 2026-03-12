@@ -6,13 +6,8 @@ requireRole("super admin");
 
 function resolveEmployeeRoleId(mysqli $conn): ?int {
     $stmt = $conn->prepare("SELECT role_id FROM roles WHERE LOWER(role_name) LIKE '%employee%' LIMIT 1");
-    if (!$stmt) {
-        return null;
-    }
-
-    if (!$stmt->execute()) {
-        return null;
-    }
+    if (!$stmt) return null;
+    if (!$stmt->execute()) return null;
 
     $result = $stmt->get_result();
     $row = $result ? $result->fetch_assoc() : null;
@@ -61,10 +56,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    exit(json_encode(["error" => "Method not allowed."]));
+    exit(json_encode(["success" => false, "message" => "Method not allowed."]));
 }
 
 $data = json_decode(file_get_contents("php://input"), true);
+if (!$data || !is_array($data)) {
+    http_response_code(400);
+    exit(json_encode(["success" => false, "message" => "Invalid JSON"]));
+}
 
 $firstName = trim((string)($data['first_name'] ?? ''));
 $middleName = trim((string)($data['middle_name'] ?? ''));
@@ -72,64 +71,62 @@ $lastName = trim((string)($data['last_name'] ?? ''));
 $address = trim((string)($data['address'] ?? ''));
 $birthdate = trim((string)($data['birthdate'] ?? ''));
 $civilStatus = trim((string)($data['civil_status'] ?? ''));
-$contactNumber = trim((string)($data['contact_number'] ?? ''));
+$email = strtolower(trim((string)($data['email'] ?? $data['work_email'] ?? '')));
 $personalEmail = strtolower(trim((string)($data['personal_email'] ?? '')));
-$workEmail = strtolower(trim((string)($data['work_email'] ?? $data['email'] ?? '')));
-$password = (string)($data['password'] ?? 'Welcome123!');
 $position = trim((string)($data['position'] ?? ''));
 $account = trim((string)($data['account'] ?? ''));
+$contactNumber = trim((string)($data['contact_number'] ?? ''));
 $employeeType = trim((string)($data['employee_type'] ?? ''));
-$employmentStatus = trim((string)($data['employment_status'] ?? 'Active'));
-$dateHired = trim((string)($data['date_hired'] ?? ''));
 
-if ($firstName === '' || $lastName === '' || $workEmail === '') {
+if ($firstName === '' || $lastName === '' || $email === '') {
     http_response_code(400);
-    exit(json_encode(["error" => "First name, last name, and work email are required."]));
+    exit(json_encode(["success" => false, "message" => "First name, last name, and email are required."]));
 }
 
 $employeeRoleId = resolveEmployeeRoleId($conn);
 if (!$employeeRoleId) {
     http_response_code(500);
-    exit(json_encode(["error" => "Employee role is not configured."]));
+    exit(json_encode(["success" => false, "message" => "Employee role is not configured."]));
 }
-
-$duplicateStmt = $conn->prepare("SELECT user_id FROM users WHERE email = ? LIMIT 1");
-if (!$duplicateStmt) {
-    http_response_code(500);
-    exit(json_encode(["error" => "Unable to validate email."]));
-}
-$duplicateStmt->bind_param("s", $workEmail);
-if (!$duplicateStmt->execute()) {
-    http_response_code(500);
-    exit(json_encode(["error" => "Unable to validate email."]));
-}
-if ($duplicateStmt->get_result()->fetch_assoc()) {
-    http_response_code(409);
-    exit(json_encode(["error" => "Work email already exists."]));
-}
-
-$hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
 $conn->begin_transaction();
 
 try {
-    $userStmt = $conn->prepare(
+    $check = $conn->prepare("SELECT user_id FROM users WHERE email = ? LIMIT 1");
+    if (!$check) {
+        throw new Exception("Unable to validate email.");
+    }
+
+    $check->bind_param("s", $email);
+    if (!$check->execute()) {
+        throw new Exception("Unable to validate email.");
+    }
+
+    $result = $check->get_result();
+    if ($result && $result->num_rows > 0) {
+        throw new Exception("Email already exists.");
+    }
+
+    $firstLetter = strtolower(substr($firstName, 0, 1));
+    $generatedPassword = $firstLetter . strtolower($lastName) . "@123!";
+    $hashedPassword = password_hash($generatedPassword, PASSWORD_BCRYPT);
+
+    $stmtUser = $conn->prepare(
         "INSERT INTO users (email, password, role_id, created_at)
          VALUES (?, ?, ?, NOW())"
     );
-
-    if (!$userStmt) {
-        throw new Exception("Unable to prepare user insert statement.");
+    if (!$stmtUser) {
+        throw new Exception("Unable to prepare user statement.");
     }
 
-    $userStmt->bind_param("ssi", $workEmail, $hashedPassword, $employeeRoleId);
-    if (!$userStmt->execute()) {
+    $stmtUser->bind_param("ssi", $email, $hashedPassword, $employeeRoleId);
+    if (!$stmtUser->execute()) {
         throw new Exception("Unable to create user account.");
     }
 
-    $userId = (int)$userStmt->insert_id;
+    $userId = (int)$stmtUser->insert_id;
 
-    $employeeStmt = $conn->prepare(
+    $stmtEmp = $conn->prepare(
         "INSERT INTO employees (
             user_id,
             first_name,
@@ -146,15 +143,17 @@ try {
             employment_status,
             employee_type,
             date_hired
-        ) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))"
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, 'Active', ?, CURDATE()
+        )"
     );
-
-    if (!$employeeStmt) {
-        throw new Exception("Unable to prepare employee insert statement.");
+    if (!$stmtEmp) {
+        throw new Exception("Unable to prepare employee statement.");
     }
 
-    $employeeStmt->bind_param(
-        "issssssssssssss",
+    $stmtEmp->bind_param(
+        "issssssssssss",
         $userId,
         $firstName,
         $middleName,
@@ -162,38 +161,32 @@ try {
         $address,
         $birthdate,
         $civilStatus,
-        $workEmail,
+        $email,
         $personalEmail,
         $position,
         $account,
         $contactNumber,
-        $employmentStatus,
-        $employeeType,
-        $dateHired
+        $employeeType
     );
 
-    if (!$employeeStmt->execute()) {
+    if (!$stmtEmp->execute()) {
         throw new Exception("Unable to create employee profile.");
     }
 
-    $employeeId = (int)$employeeStmt->insert_id;
     $conn->commit();
 
     echo json_encode([
         "success" => true,
-        "employee" => [
-            "id" => $employeeId,
-            "fullname" => trim("{$firstName} {$middleName} {$lastName}"),
-            "position" => $position,
-            "account" => $account,
-            "employee_type" => $employeeType,
-            "employment_status" => $employmentStatus,
-            "date_hired" => $dateHired,
-            "email" => $workEmail
+        "generated_account" => [
+            "email" => $email,
+            "password" => $generatedPassword
         ]
     ]);
 } catch (Throwable $error) {
     $conn->rollback();
     http_response_code(500);
-    echo json_encode(["error" => $error->getMessage()]);
+    echo json_encode([
+        "success" => false,
+        "message" => $error->getMessage()
+    ]);
 }
