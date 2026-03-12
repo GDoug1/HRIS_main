@@ -26,8 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 COALESCE(e.email, u.email, '') AS email
             FROM employees e
             LEFT JOIN users u ON u.user_id = e.user_id
-            LEFT JOIN roles r ON r.role_id = u.role_id
-            WHERE LOWER(COALESCE(r.role_name, '')) LIKE '%employee%'
             ORDER BY e.employee_id DESC";
 
     $result = $conn->query($sql);
