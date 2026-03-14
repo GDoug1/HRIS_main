@@ -1,0 +1,284 @@
+import { useMemo, useState } from "react";
+
+const PERMISSION_OPTIONS = [
+  "View dashboard",
+  "View attendance",
+  "Edit attendance",
+  "Manage team requests",
+  "Manage schedules",
+  "Manage members",
+  "Manage employees",
+  "Access reports",
+  "Export records",
+  "Manage system settings"
+];
+
+const INITIAL_ROLE_PERMISSIONS = [
+  {
+    id: "super-admin",
+    role: "Super Admin",
+    description: "Full platform control and approvals.",
+    permissions: [...PERMISSION_OPTIONS]
+  },
+  {
+    id: "admin",
+    role: "Admin",
+    description: "Manages team operations and employee records.",
+    permissions: [
+      "View dashboard",
+      "View attendance",
+      "Edit attendance",
+      "Manage team requests",
+      "Manage schedules",
+      "Manage employees",
+      "Access reports"
+    ]
+  },
+  {
+    id: "coach",
+    role: "Coach",
+    description: "Handles team attendance and schedule updates.",
+    permissions: [
+      "View dashboard",
+      "View attendance",
+      "Edit attendance",
+      "Manage schedules",
+      "Manage members"
+    ]
+  },
+  {
+    id: "employee",
+    role: "Employee",
+    description: "Tracks attendance and submits requests.",
+    permissions: ["View dashboard", "View attendance"]
+  }
+];
+
+const INITIAL_USER_PERMISSIONS = [
+  {
+    id: "USR-001",
+    name: "Mia Santos",
+    role: "Admin",
+    email: "mia.santos@company.com",
+    permissions: [
+      "View dashboard",
+      "View attendance",
+      "Edit attendance",
+      "Manage schedules"
+    ]
+  },
+  {
+    id: "USR-002",
+    name: "Lucas Reyes",
+    role: "Coach",
+    email: "lucas.reyes@company.com",
+    permissions: ["View dashboard", "View attendance", "Manage members"]
+  },
+  {
+    id: "USR-003",
+    name: "Bea Cruz",
+    role: "Employee",
+    email: "bea.cruz@company.com",
+    permissions: ["View dashboard", "View attendance"]
+  }
+];
+
+function PermissionEditorModal({ title, selectedPermissions, onClose, onSave }) {
+  const [draftPermissions, setDraftPermissions] = useState(selectedPermissions);
+
+  const togglePermission = permission => {
+    setDraftPermissions(current => {
+      if (current.includes(permission)) {
+        return current.filter(item => item !== permission);
+      }
+      return [...current, permission];
+    });
+  };
+
+  const handleSave = () => onSave(draftPermissions);
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={`${title} permission editor`}>
+      <div className="modal-card permission-modal">
+        <h3 className="permission-modal-title">Edit Permission</h3>
+        <p className="modal-subtitle">{title}</p>
+
+        <div className="permission-modal-list" role="group" aria-label="Permission options">
+          {PERMISSION_OPTIONS.map(permission => (
+            <label key={permission} className="permission-modal-item">
+              <input
+                type="checkbox"
+                checked={draftPermissions.includes(permission)}
+                onChange={() => togglePermission(permission)}
+              />
+              <span>{permission}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="permission-modal-actions">
+          <button className="btn secondary" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn permission-save-btn" type="button" onClick={handleSave}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ControlPanelSection() {
+  const [activeTab, setActiveTab] = useState("role");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [rolePermissions, setRolePermissions] = useState(INITIAL_ROLE_PERMISSIONS);
+  const [userPermissions, setUserPermissions] = useState(INITIAL_USER_PERMISSIONS);
+  const [editingRoleId, setEditingRoleId] = useState("");
+  const [editingUserId, setEditingUserId] = useState("");
+
+  const filteredRoles = useMemo(() => {
+    const value = searchTerm.trim().toLowerCase();
+    if (!value) return rolePermissions;
+
+    return rolePermissions.filter(item => {
+      return item.role.toLowerCase().includes(value)
+        || item.description.toLowerCase().includes(value)
+        || item.permissions.some(permission => permission.toLowerCase().includes(value));
+    });
+  }, [rolePermissions, searchTerm]);
+
+  const filteredUsers = useMemo(() => {
+    const value = searchTerm.trim().toLowerCase();
+    if (!value) return userPermissions;
+
+    return userPermissions.filter(item => {
+      return item.name.toLowerCase().includes(value)
+        || item.role.toLowerCase().includes(value)
+        || item.email.toLowerCase().includes(value)
+        || item.permissions.some(permission => permission.toLowerCase().includes(value));
+    });
+  }, [userPermissions, searchTerm]);
+
+  const editingRole = rolePermissions.find(item => item.id === editingRoleId);
+  const editingUser = userPermissions.find(item => item.id === editingUserId);
+
+  const handleSaveRolePermissions = permissions => {
+    setRolePermissions(current => current.map(item => (
+      item.id === editingRoleId ? { ...item, permissions } : item
+    )));
+    setEditingRoleId("");
+  };
+
+  const handleSaveUserPermissions = permissions => {
+    setUserPermissions(current => current.map(item => (
+      item.id === editingUserId ? { ...item, permissions } : item
+    )));
+    setEditingUserId("");
+  };
+
+  return (
+    <section className="control-panel-content" aria-label="Control panel permission editor">
+      <header className="control-panel-header">
+        <h2>Control Panel</h2>
+        <p>Manage access rights by role or assign custom permissions to a specific user.</p>
+      </header>
+
+      <div className="control-panel-tabs" role="tablist" aria-label="Permission view mode">
+        <button
+          className={`control-panel-tab${activeTab === "role" ? " active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "role"}
+          onClick={() => setActiveTab("role")}
+        >
+          By Role
+        </button>
+        <button
+          className={`control-panel-tab${activeTab === "individual" ? " active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "individual"}
+          onClick={() => setActiveTab("individual")}
+        >
+          Individual Access
+        </button>
+      </div>
+
+      <input
+        className="control-panel-search"
+        type="search"
+        value={searchTerm}
+        onChange={event => setSearchTerm(event.target.value)}
+        placeholder={activeTab === "role" ? "Search role or permission..." : "Search user, role, or permission..."}
+      />
+
+      {activeTab === "role" ? (
+        <div className="permission-card-grid">
+          {filteredRoles.map(roleItem => (
+            <article key={roleItem.id} className="permission-card">
+              <div className="permission-card-header">{roleItem.role}</div>
+              <div className="permission-card-body">
+                <p className="permission-card-label">{roleItem.description}</p>
+                <ul>
+                  {roleItem.permissions.map(permission => (
+                    <li key={`${roleItem.id}-${permission}`}>{permission}</li>
+                  ))}
+                </ul>
+                <button
+                  className="btn permission-edit-btn"
+                  type="button"
+                  onClick={() => setEditingRoleId(roleItem.id)}
+                >
+                  Edit Permission
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="control-panel-table-wrap" role="table" aria-label="Individual permission table">
+          <div className="control-panel-table-header" role="row">
+            <span role="columnheader">ID</span>
+            <span role="columnheader">User</span>
+            <span role="columnheader">Role</span>
+            <span role="columnheader">Permissions</span>
+            <span role="columnheader">Action</span>
+          </div>
+
+          {filteredUsers.map(userItem => (
+            <div key={userItem.id} className="control-panel-table-row" role="row">
+              <span role="cell">{userItem.id}</span>
+              <span role="cell">{userItem.name}</span>
+              <span role="cell">{userItem.role}</span>
+              <span role="cell">{userItem.permissions.length}</span>
+              <span role="cell">
+                <button
+                  className="btn permission-edit-btn"
+                  type="button"
+                  onClick={() => setEditingUserId(userItem.id)}
+                >
+                  Edit Permission
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editingRole ? (
+        <PermissionEditorModal
+          title={`${editingRole.role} Role`}
+          selectedPermissions={editingRole.permissions}
+          onClose={() => setEditingRoleId("")}
+          onSave={handleSaveRolePermissions}
+        />
+      ) : null}
+
+      {editingUser ? (
+        <PermissionEditorModal
+          title={`${editingUser.name} (${editingUser.role})`}
+          selectedPermissions={editingUser.permissions}
+          onClose={() => setEditingUserId("")}
+          onSave={handleSaveUserPermissions}
+        />
+      ) : null}
+    </section>
+  );
+}
