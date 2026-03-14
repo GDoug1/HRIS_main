@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 
 const PERMISSION_OPTIONS = [
-  "View dashboard",
-  "View attendance",
-  "Edit attendance",
-  "Manage team requests",
-  "Manage schedules",
-  "Manage members",
-  "Manage employees",
-  "Access reports",
-  "Export records",
-  "Manage system settings"
+  "Add Employee",
+  "Edit Employee",
+  "Delete Employee",
+  "Set Attendance",
+  "Edit Attendance",
+  "View Dashboard",
+  "View Team",
+  "View Attendance",
+  "View Employee List",
+  "Edit Profile",
+  "Access Control Panel"
 ];
 
 const INITIAL_ROLE_PERMISSIONS = [
@@ -25,13 +26,16 @@ const INITIAL_ROLE_PERMISSIONS = [
     role: "Admin",
     description: "Manages team operations and employee records.",
     permissions: [
-      "View dashboard",
-      "View attendance",
-      "Edit attendance",
-      "Manage team requests",
-      "Manage schedules",
-      "Manage employees",
-      "Access reports"
+      "Add Employee",
+      "Edit Employee",
+      "Delete Employee",
+      "Set Attendance",
+      "Edit Attendance",
+      "View Dashboard",
+      "View Team",
+      "View Attendance",
+      "View Employee List",
+      "Edit Profile"
     ]
   },
   {
@@ -39,18 +43,19 @@ const INITIAL_ROLE_PERMISSIONS = [
     role: "Coach",
     description: "Handles team attendance and schedule updates.",
     permissions: [
-      "View dashboard",
-      "View attendance",
-      "Edit attendance",
-      "Manage schedules",
-      "Manage members"
+      "Set Attendance",
+      "Edit Attendance",
+      "View Dashboard",
+      "View Team",
+      "View Attendance",
+      "View Employee List"
     ]
   },
   {
     id: "employee",
     role: "Employee",
     description: "Tracks attendance and submits requests.",
-    permissions: ["View dashboard", "View attendance"]
+    permissions: ["View Dashboard", "View Attendance", "Edit Profile"]
   }
 ];
 
@@ -61,10 +66,11 @@ const INITIAL_USER_PERMISSIONS = [
     role: "Admin",
     email: "mia.santos@company.com",
     permissions: [
-      "View dashboard",
-      "View attendance",
-      "Edit attendance",
-      "Manage schedules"
+      "Set Attendance",
+      "Edit Attendance",
+      "View Dashboard",
+      "View Attendance",
+      "View Team"
     ]
   },
   {
@@ -72,14 +78,14 @@ const INITIAL_USER_PERMISSIONS = [
     name: "Lucas Reyes",
     role: "Coach",
     email: "lucas.reyes@company.com",
-    permissions: ["View dashboard", "View attendance", "Manage members"]
+    permissions: ["Set Attendance", "View Dashboard", "View Team", "View Attendance"]
   },
   {
     id: "USR-003",
     name: "Bea Cruz",
     role: "Employee",
     email: "bea.cruz@company.com",
-    permissions: ["View dashboard", "View attendance"]
+    permissions: ["View Dashboard", "View Attendance", "Edit Profile"]
   }
 ];
 
