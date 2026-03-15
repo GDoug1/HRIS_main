@@ -2,7 +2,7 @@
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 
-requireRole(["super admin", "admin"]);
+requireRoleOrPermission(["super admin", "admin"], $conn, "Access Control Panel");
 
 function getAllPermissions(mysqli $conn): array {
     $result = $conn->query("SELECT permission_id, permission_name FROM permissions ORDER BY permission_id ASC");
