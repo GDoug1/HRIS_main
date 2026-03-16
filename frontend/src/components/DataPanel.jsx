@@ -131,7 +131,6 @@ export default function DataPanel({
           <span role="columnheader">Status</span>
           <span role="columnheader">Cluster</span>
           {personField && <span role="columnheader">{personLabel}</span>}
-          <span role="columnheader">Note</span>
           {onEditRow && <span role="columnheader">Action</span>}
         </div>
 
