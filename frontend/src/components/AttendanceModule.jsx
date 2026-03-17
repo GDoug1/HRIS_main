@@ -1,0 +1,156 @@
+import React, { useState, useMemo } from 'react';
+import { Search, Calendar, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
+import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
+import '../styles/AttendanceModule.css';
+
+const StatCard = ({ title, value, delta, icon: Icon, colorClass, isOffline }) => (
+  <div className="am-stat-card">
+    <div className="am-stat-header">
+      <span className="am-stat-title">{title}</span>
+      <div className="am-stat-icon-wrapper" style={{ backgroundColor: colorClass }}>
+        <Icon />
+      </div>
+    </div>
+    <div className="am-stat-value" style={{ color: isOffline ? '#cbd5e1' : undefined }}>
+      {isOffline ? "--" : value}
+    </div>
+    <div className="am-stat-delta">{isOffline ? "N/A" : delta}</div>
+  </div>
+);
+
+const getStatusColor = (status) => {
+  const s = String(status).toLowerCase();
+  if (['present', 'approved'].includes(s)) return '#52c41a';
+  if (['absent', 'denied'].includes(s)) return '#f5222d';
+  if (s === 'late') return '#faad14';
+  if (s === 'pending') return '#1890ff';
+  return '#cbd5e1';
+};
+
+export default function AttendanceModule() {
+  const { data, loading, error } = useAttendanceHistory();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const stats = useMemo(() => {
+    if (!data.length) return { hours: '0.00', present: 0, late: 0, ot: '0.00' };
+    
+    const totalHrs = data.reduce((acc, curr) => acc + parseFloat(curr.total_hours || 0), 0);
+    const presentCount = data.filter(r => ['present', 'approved'].includes(r.status.toLowerCase())).length;
+    const lateCount = data.filter(r => r.status.toLowerCase() === 'late').length;
+    
+    return {
+      hours: totalHrs.toFixed(2),
+      present: presentCount,
+      late: lateCount,
+      ot: '0.00' 
+    };
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    if (!searchQuery) return data;
+    return data.filter(r => 
+      r.date?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      r.status?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [data, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="am-loading">
+        <Loader2 size={40} />
+        <p style={{ color: '#64748b', fontWeight: 500 }}>Syncing records...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="am-container">
+      {error && (
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+           <div className="am-offline-banner">Offline: {error}</div>
+        </div>
+      )}
+
+      <div className="am-stats-grid">
+        <StatCard title="Total Hours" value={stats.hours} delta="Calculated from logs" icon={Clock} colorClass="#64748b" isOffline={!!error} />
+        <StatCard title="Days Present" value={stats.present} delta="Count of active shifts" icon={CheckCircle2} colorClass="#52c41a" isOffline={!!error} />
+        <StatCard title="Total Late" value={stats.late} delta="Requires attention" icon={AlertCircle} colorClass="#faad14" isOffline={!!error} />
+        <StatCard title="Overtime" value={stats.ot} delta="Pending approval" icon={ArrowUpRight} colorClass="#1890ff" isOffline={!!error} />
+      </div>
+
+      <div className="am-content-panel">
+        <div className="am-toolbar">
+          <h2 className="am-toolbar-title">My Attendance Logs</h2>
+          <div className="am-toolbar-actions">
+            <button className="am-btn-outline" disabled={!!error}>
+              <Calendar size={16} />
+              <span>Filter Dates</span>
+            </button>
+            <div className="am-search-container">
+              <input 
+                type="text"
+                disabled={!!error}
+                placeholder="Search logs..."
+                className="am-search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search className="am-search-icon" />
+            </div>
+          </div>
+        </div>
+
+        <div className="am-table-wrapper">
+          <table className="am-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time In</th>
+                <th>Time Out</th>
+                <th>Break In</th>
+                <th>Break Out</th>
+                <th>Total Hours</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {error ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '60px' }}>
+                    <ListTodo size={48} color="#cbd5e1" style={{ marginBottom: '16px' }} />
+                    <p style={{ color: '#475569', fontWeight: 'bold' }}>Server Connection Lost</p>
+                  </td>
+                </tr>
+              ) : filteredData.length === 0 ? (
+                <tr><td colSpan={8} className="am-empty">No records found.</td></tr>
+              ) : filteredData.map((record, i) => (
+                <tr key={i}>
+                  <td className="am-td-date">{record.date}</td>
+                  <td className="am-td-time">{record.time_in}</td>
+                  <td className="am-td-time">{record.time_out}</td>
+                  <td className="am-td-break">{record.break_in}</td>
+                  <td className="am-td-break">{record.break_out}</td>
+                  <td className="am-td-total">{record.total_hours}h</td>
+                  <td>
+                    <div className="am-status-cell">
+                      <div className="am-status-dot" style={{ backgroundColor: getStatusColor(record.status) }} />
+                      <span className="am-status-text">{record.status}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="am-actions-hover">
+                      <button className="am-action-btn primary">Dispute</button>
+                      <div className="am-divider" />
+                      <button className="am-action-btn secondary">Details</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
