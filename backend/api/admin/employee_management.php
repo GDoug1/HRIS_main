@@ -84,6 +84,22 @@ function resolveEmployeeRoleId(mysqli $conn): ?int {
     return isset($row['role_id']) ? (int)$row['role_id'] : null;
 }
 
+function validateEmployeeNameFields(string $firstName, string $middleName, string $lastName): ?string {
+    $nameFields = [
+        "First name" => $firstName,
+        "Middle name" => $middleName,
+        "Last name" => $lastName
+    ];
+
+    foreach ($nameFields as $label => $value) {
+        if ($value !== '' && preg_match('/\d/', $value) === 1) {
+            return "{$label} cannot contain numbers.";
+        }
+    }
+
+    return null;
+}
+
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($requestMethod === 'GET') {
@@ -251,6 +267,12 @@ if ($requestMethod === 'PUT') {
     if ($firstName === '' || $lastName === '' || $email === '') {
         http_response_code(400);
         exit(json_encode(["success" => false, "message" => "First name, last name, and email are required."]));
+    }
+
+    $nameValidationError = validateEmployeeNameFields($firstName, $middleName, $lastName);
+    if ($nameValidationError !== null) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => $nameValidationError]));
     }
 
     $conn->begin_transaction();
@@ -428,6 +450,12 @@ $employeeType = trim((string)($data['employee_type'] ?? ''));
 if ($firstName === '' || $lastName === '' || $email === '') {
     http_response_code(400);
     exit(json_encode(["success" => false, "message" => "First name, last name, and email are required."]));
+}
+
+$nameValidationError = validateEmployeeNameFields($firstName, $middleName, $lastName);
+if ($nameValidationError !== null) {
+    http_response_code(400);
+    exit(json_encode(["success" => false, "message" => $nameValidationError]));
 }
 
 $employeeRoleId = resolveEmployeeRoleId($conn);

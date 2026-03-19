@@ -586,7 +586,9 @@ body {
 .table-card {
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
 }
 
 .table-header,
@@ -597,6 +599,7 @@ body {
   gap: 12px;
   padding: 10px 14px;
   font-size: 12px;
+  min-width: 960px;
 }
 
 .table-header {
@@ -2574,17 +2577,20 @@ body {
 .control-panel-table-wrap {
   border: 1px solid #d1d5db;
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
   background: #fff;
 }
 
 .control-panel-table-header,
 .control-panel-table-row {
   display: grid;
-  align-items: center;
+  align-items: start;
   grid-template-columns: minmax(70px, 0.6fr) minmax(180px, 1.4fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(140px, 1fr);
   gap: 16px;
   padding: 14px 18px;
+  min-width: 880px;
 }
 
 .control-panel-table-header {
@@ -2599,8 +2605,82 @@ body {
   font-size: 16px;
 }
 
+.control-panel-table-header > [role="columnheader"],
+.control-panel-table-row > [role="cell"] {
+  min-width: 0;
+}
+
+.control-panel-table-row > [role="cell"] {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .control-panel-table-wrap[aria-label="Control panel logs table"] .control-panel-table-header {
-  grid-template-columns: minmax(70px, 0.6fr) minmax(220px, 1.2fr) minmax(200px, 1fr) minmax(180px, 1fr) minmax(160px, 1fr);
+  grid-template-columns: minmax(70px, 0.55fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(120px, 0.7fr) minmax(220px, 1.1fr);
+}
+
+.control-panel-table-wrap[aria-label="Control panel logs table"] .control-panel-table-row {
+  grid-template-columns: minmax(70px, 0.55fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(120px, 0.7fr) minmax(220px, 1.1fr);
+}
+
+.control-panel-logs-table {
+  max-height: min(60vh, 540px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.control-panel-logs-table .control-panel-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.log-view-btn {
+  min-width: 88px;
+}
+
+.log-details-modal {
+  width: min(720px, 94vw);
+  display: grid;
+  gap: 18px;
+}
+
+.log-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.log-detail-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  background: #f8fafc;
+  min-width: 0;
+}
+
+.log-detail-card-full {
+  grid-column: 1 / -1;
+}
+
+.log-detail-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.log-detail-value,
+.log-detail-description {
+  margin: 0;
+  font-size: 15px;
+  color: #0f172a;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .control-panel-table-wrap[aria-label="User archives table"] .control-panel-table-header,
@@ -2723,5 +2803,73 @@ body {
 @media (max-width: 900px) {
   .permission-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .control-panel-table-wrap {
+    overflow: visible;
+    border-radius: 16px;
+  }
+
+  .control-panel-logs-table {
+    max-height: min(70vh, 560px);
+    overflow: auto;
+  }
+
+  .control-panel-table-header {
+    display: none;
+  }
+
+  .control-panel-table-row,
+  .control-panel-table-wrap[aria-label="Control panel logs table"] .control-panel-table-row,
+  .control-panel-table-wrap[aria-label="User archives table"] .control-panel-table-row {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .control-panel-table-row > [role="cell"] {
+    display: grid;
+    grid-template-columns: minmax(92px, 110px) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .control-panel-table-row > [role="cell"]::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+  }
+
+  .control-panel-table-row .permission-edit-btn,
+  .user-archive-actions .btn {
+    width: 100%;
+  }
+
+  .user-archive-actions {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .log-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .log-detail-card-full {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-card {
+    border-radius: 12px;
+  }
+
+  .table-header,
+  .table-row {
+    min-width: 860px;
   }
 }

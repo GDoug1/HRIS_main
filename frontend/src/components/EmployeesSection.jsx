@@ -108,6 +108,9 @@ const employmentAccounts = [
 ];
 
 const employeeTypes = ["Regular", "Probationary", "Contractual", "Intern"];
+const employeeNameFields = new Set(["first_name", "middle_name", "last_name"]);
+const hasDigitPattern = /\d/;
+const sanitizeEmployeeName = value => value.replace(/\d+/g, "");
 
 const formatDate = dateString => {
   if (!dateString) return "—";
@@ -197,8 +200,23 @@ export default function EmployeesSection() {
     fetchEmployees();
   }, [fetchEmployees]);
 
+  const handleEmployeeNameKeyDown = event => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key.length === 1 && hasDigitPattern.test(event.key)) {
+      event.preventDefault();
+    }
+  };
+
   const handleAddEmployeeChange = event => {
     const { name, value } = event.target;
+
+    if (employeeNameFields.has(name)) {
+      setAddEmployeeForm(current => ({
+        ...current,
+        [name]: sanitizeEmployeeName(value)
+      }));
+      return;
+    }
 
     if (name === "contact_number") {
       let cleaned = value.replace(/\D/g, ""); // remove non-numbers
@@ -263,6 +281,14 @@ export default function EmployeesSection() {
 
   const handleEditEmployeeChange = event => {
     const { name, value } = event.target;
+
+    if (employeeNameFields.has(name)) {
+      setEditEmployeeForm(current => ({
+        ...current,
+        [name]: sanitizeEmployeeName(value)
+      }));
+      return;
+    }
 
     if (name === "contact_number") {
       let cleaned = value.replace(/\D/g, "");
@@ -506,9 +532,9 @@ export default function EmployeesSection() {
               {addEmployeeActiveTab === "personal" && (
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
-                    <label className="form-field" htmlFor="employee-first-name"><input id="employee-first-name" name="first_name" placeholder="First Name" value={addEmployeeForm.first_name} onChange={handleAddEmployeeChange} required /></label>
-                    <label className="form-field" htmlFor="employee-middle-name"><input id="employee-middle-name" name="middle_name" placeholder="Middle Name" value={addEmployeeForm.middle_name} onChange={handleAddEmployeeChange} /></label>
-                    <label className="form-field add-employee-last-name" htmlFor="employee-last-name"><input id="employee-last-name" name="last_name" placeholder="Last Name" value={addEmployeeForm.last_name} onChange={handleAddEmployeeChange} required /></label>
+                    <label className="form-field" htmlFor="employee-first-name"><input id="employee-first-name" name="first_name" placeholder="First Name" value={addEmployeeForm.first_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
+                    <label className="form-field" htmlFor="employee-middle-name"><input id="employee-middle-name" name="middle_name" placeholder="Middle Name" value={addEmployeeForm.middle_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." /></label>
+                    <label className="form-field add-employee-last-name" htmlFor="employee-last-name"><input id="employee-last-name" name="last_name" placeholder="Last Name" value={addEmployeeForm.last_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
                     <label className="form-field add-employee-full-width" htmlFor="employee-address"><input id="employee-address" name="address" placeholder="Address" value={addEmployeeForm.address} onChange={handleAddEmployeeChange} /></label>
                     <label className="form-field" htmlFor="employee-birthdate"><input id="employee-birthdate" type="date" name="birthdate" value={addEmployeeForm.birthdate} onChange={handleAddEmployeeChange} /></label>
                     <label className="form-field" htmlFor="employee-contact-number">
@@ -596,9 +622,9 @@ export default function EmployeesSection() {
               {editEmployeeActiveTab === "personal" && (
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
-                    <label className="form-field" htmlFor="edit-employee-first-name"><input id="edit-employee-first-name" name="first_name" placeholder="First Name" value={editEmployeeForm.first_name} onChange={handleEditEmployeeChange} required /></label>
-                    <label className="form-field" htmlFor="edit-employee-middle-name"><input id="edit-employee-middle-name" name="middle_name" placeholder="Middle Name" value={editEmployeeForm.middle_name} onChange={handleEditEmployeeChange} /></label>
-                    <label className="form-field add-employee-last-name" htmlFor="edit-employee-last-name"><input id="edit-employee-last-name" name="last_name" placeholder="Last Name" value={editEmployeeForm.last_name} onChange={handleEditEmployeeChange} required /></label>
+                    <label className="form-field" htmlFor="edit-employee-first-name"><input id="edit-employee-first-name" name="first_name" placeholder="First Name" value={editEmployeeForm.first_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
+                    <label className="form-field" htmlFor="edit-employee-middle-name"><input id="edit-employee-middle-name" name="middle_name" placeholder="Middle Name" value={editEmployeeForm.middle_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." /></label>
+                    <label className="form-field add-employee-last-name" htmlFor="edit-employee-last-name"><input id="edit-employee-last-name" name="last_name" placeholder="Last Name" value={editEmployeeForm.last_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
                     <label className="form-field add-employee-full-width" htmlFor="edit-employee-address"><input id="edit-employee-address" name="address" placeholder="Address" value={editEmployeeForm.address} onChange={handleEditEmployeeChange} /></label>
                     <label className="form-field" htmlFor="edit-employee-birthdate"><input id="edit-employee-birthdate" type="date" name="birthdate" value={editEmployeeForm.birthdate} onChange={handleEditEmployeeChange} /></label>
                     <label className="form-field" htmlFor="edit-employee-contact-number">

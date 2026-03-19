@@ -83,6 +83,50 @@ function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions
   );
 }
 
+function LogDetailsModal({ log, onClose }) {
+  if (!log) return null;
+
+  useEffect(() => {
+    const handleKeyDown = event => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Log details" onClick={onClose}>
+      <div className="modal-card log-details-modal" onClick={event => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h3 className="permission-modal-title">Log Details</h3>
+            <p className="modal-subtitle">{log.action || "No action provided"}</p>
+          </div>
+          <button className="btn secondary" type="button" onClick={onClose}>Close</button>
+        </div>
+
+        <div className="log-details-grid">
+          <div className="log-detail-card">
+            <span className="log-detail-label">User</span>
+            <span className="log-detail-value">{log.user || "-"}</span>
+          </div>
+          <div className="log-detail-card">
+            <span className="log-detail-label">Date</span>
+            <span className="log-detail-value">{log.created_at || "-"}</span>
+          </div>
+          <div className="log-detail-card log-detail-card-full">
+            <span className="log-detail-label">Description</span>
+            <p className="log-detail-description">{log.target || "-"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ControlPanelSection() {
   const [activeTab, setActiveTab] = useState("role");
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,6 +147,7 @@ export default function ControlPanelSection() {
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logsError, setLogsError] = useState("");
+  const [selectedLog, setSelectedLog] = useState(null);
 
   const showRolePermissions = activeTab === "role";
   const showIndividualAccess = activeTab === "individual";
@@ -383,8 +428,8 @@ export default function ControlPanelSection() {
           </div>
           {filteredUsers.map(userItem => (
             <div key={userItem.id} className="control-panel-table-row" role="row">
-              <span role="cell">{userItem.id}</span><span role="cell">{userItem.name}</span><span role="cell">{userItem.role}</span><span role="cell">{userItem.permissions.length}</span>
-              <span role="cell"><button className="btn permission-edit-btn" type="button" onClick={() => { setUserSaveError(""); setEditingUserId(userItem.id); }}>Edit Permission</button></span>
+              <span role="cell" data-label="ID">{userItem.id}</span><span role="cell" data-label="User">{userItem.name}</span><span role="cell" data-label="Role">{userItem.role}</span><span role="cell" data-label="Permissions">{userItem.permissions.length}</span>
+              <span role="cell" data-label="Action"><button className="btn permission-edit-btn" type="button" onClick={() => { setUserSaveError(""); setEditingUserId(userItem.id); }}>Edit Permission</button></span>
             </div>
           ))}
         </div>
@@ -392,13 +437,21 @@ export default function ControlPanelSection() {
         <>
           {logsError ? <p className="team-empty-note">{logsError}</p> : null}
           {loadingLogs ? <p className="team-empty-note">Loading logs...</p> : filteredLogs.length === 0 ? <p className="team-empty-note">No logs found.</p> : (
-            <div className="control-panel-table-wrap" role="table" aria-label="Control panel logs table">
+            <div className="control-panel-table-wrap control-panel-logs-table" role="table" aria-label="Control panel logs table">
               <div className="control-panel-table-header" role="row">
-                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">Details</span><span role="columnheader">Date</span>
+                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">View</span><span role="columnheader">Date</span>
               </div>
               {filteredLogs.map(logItem => (
                 <div key={logItem.id} className="control-panel-table-row" role="row">
-                  <span role="cell">{logItem.id}</span><span role="cell">{logItem.user}</span><span role="cell">{logItem.action || "—"}</span><span role="cell">{logItem.target || "—"}</span><span role="cell">{logItem.created_at || "—"}</span>
+                  <span role="cell" data-label="ID">{logItem.id}</span>
+                  <span role="cell" data-label="User">{logItem.user}</span>
+                  <span role="cell" data-label="Action">{logItem.action || "-"}</span>
+                  <span role="cell" data-label="View">
+                    <button className="btn secondary log-view-btn" type="button" onClick={() => setSelectedLog(logItem)}>
+                      View
+                    </button>
+                  </span>
+                  <span role="cell" data-label="Date">{logItem.created_at || "-"}</span>
                 </div>
               ))}
             </div>
@@ -414,10 +467,10 @@ export default function ControlPanelSection() {
               </div>
               {filteredArchivedUsers.map(userItem => (
                 <div key={userItem.id} className="control-panel-table-row" role="row">
-                  <span role="cell">{userItem.id}</span>
-                  <span role="cell">{userItem.fullname || userItem.email || `Employee #${userItem.id}`}</span>
-                  <span role="cell">{userItem.position || "—"}</span>
-                  <span role="cell" className="user-archive-actions">
+                  <span role="cell" data-label="ID">{userItem.id}</span>
+                  <span role="cell" data-label="User">{userItem.fullname || userItem.email || `Employee #${userItem.id}`}</span>
+                  <span role="cell" data-label="Position">{userItem.position || "—"}</span>
+                  <span role="cell" data-label="Action" className="user-archive-actions">
                     <button className="btn secondary" type="button" onClick={() => handleArchiveAction(userItem.id, "restore_user", "Restore this archived user?")} disabled={archiveActionEmployeeId === userItem.id}>
                       {archiveActionEmployeeId === userItem.id ? "Updating..." : "Restore"}
                     </button>
@@ -453,6 +506,12 @@ export default function ControlPanelSection() {
           errorMessage={userSaveError}
         />
       ) : null}
+
+      {selectedLog ? (
+        <LogDetailsModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+      ) : null}
     </section>
   );
 }
+
+
