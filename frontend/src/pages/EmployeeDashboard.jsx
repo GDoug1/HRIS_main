@@ -1,3 +1,5 @@
+import "../styles/DashboardLayout.css";
+import "../styles/EmployeeDashboard.css";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
@@ -8,6 +10,7 @@ import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighligh
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
 import EmployeesSection from "../components/EmployeesSection";
+import AttendanceModule from "../components/AttendanceModule";
 import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
@@ -491,15 +494,11 @@ export default function EmployeeDashboard() {
             <div className="employee-panel">
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
-                  <div className="employee-card-header">
-                    <div className="employee-card-title">My Attendance</div>
-                  </div>
-                  <div className="employee-card-body">
-                    <AttendanceHistoryHighlights />
-                    <DataPanel type="attendance" records={attendanceHistory} />
+                  <div className="employee-card-body employee-card-body-flush">
+                    <AttendanceModule />
                   </div>
                 </div>
-                 )}
+              )}
 
               {activeNav === "My Requests" && (
                 <div className="employee-card">
