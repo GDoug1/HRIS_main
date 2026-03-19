@@ -110,13 +110,29 @@ function ShiftCard({ schedule = null, dashboardMeta = null }) {
   );
 }
 
-function CalendarCard({ calendarData }) {
+function CalendarCard({ calendarData, onPrevMonth, onNextMonth }) {
   return (
     <div className="card calendar-card">
       <div className="card-top">
+        <button 
+          type="button"
+          className="calendar-nav-btn" 
+          onClick={onPrevMonth}
+          title="Previous month"
+        >
+          ◀
+        </button>
         <span>Calendar</span>
-        <span className="calendar-month">{calendarData.monthLabel}</span>
+        <button 
+          type="button"
+          className="calendar-nav-btn" 
+          onClick={onNextMonth}
+          title="Next month"
+        >
+          ▶
+        </button>
       </div>
+      <div className="calendar-month-label">{calendarData.monthLabel}</div>
       <div className="calendar-grid weekdays">
         {calendarData.weekDays.map(weekday => (
           <div key={weekday} className="calendar-cell header">{weekday}</div>
@@ -205,6 +221,17 @@ function MemberStatusCard() {
   );
 }
 
+function DateTimeSection({ now }) {
+  return (
+    <div className="time-datetime-section">
+      <div className="time-datetime-display">
+        {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })}{" "}
+        {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+      </div>
+    </div>
+  );
+}
+
 export default function MainDashboard({
   attendanceControls = null,
   showMemberStatusCard = false,
@@ -215,6 +242,7 @@ export default function MainDashboard({
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
   const [isTimeOutConfirmOpen, setIsTimeOutConfirmOpen] = useState(false);
+  const [displayDate, setDisplayDate] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -242,8 +270,8 @@ export default function MainDashboard({
 
   const calendarData = useMemo(() => {
     const currentDate = new Date();
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const year = displayDate.getFullYear();
+    const month = displayDate.getMonth();
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -262,11 +290,11 @@ export default function MainDashboard({
     }
 
     return {
-      monthLabel: currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      monthLabel: displayDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
       weekDays,
       cells,
     };
-  }, []);
+  }, [displayDate]);
 
 
   const totalHours = useMemo(() => {
@@ -310,14 +338,23 @@ export default function MainDashboard({
     setTimeInStart(new Date());
   };
 
+  const handlePrevMonth = () => {
+    setDisplayDate(prevDate => new Date(prevDate.getFullYear(), prevDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setDisplayDate(prevDate => new Date(prevDate.getFullYear(), prevDate.getMonth() + 1, 1));
+  };
+
   return (
     <>
       <DashboardHeader
-        headerTime={now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-        headerDate={now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+        headerTime=""
+        headerDate=""
       />
 
       <div className={`dashboard-grid ${showMemberStatusCard ? "has-member-status" : "no-member-status"}`}>
+        <DateTimeSection now={now} />
         <TimeCard
           counterDisplay={counterDisplay}
           hasActiveTimeIn={hasActiveTimeIn}
@@ -328,7 +365,11 @@ export default function MainDashboard({
         />
         <AnnouncementCard canEdit={canEditCards} />
         <ShiftCard schedule={schedule} dashboardMeta={dashboardMeta} />
-        <CalendarCard calendarData={calendarData} />
+        <CalendarCard 
+          calendarData={calendarData} 
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+        />
         <HolidayCard canEdit={canEditCards} />
         <SummaryCard
           timeInStart={activeTimeIn}
