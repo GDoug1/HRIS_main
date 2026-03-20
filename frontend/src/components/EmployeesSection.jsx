@@ -110,7 +110,32 @@ const employmentAccounts = [
 
 const employeeTypes = ["Regular", "Probationary", "Contractual", "Intern"];
 const employeeNameFields = new Set(["first_name", "middle_name", "last_name"]);
+const employeePersonalRequiredFields = [
+  "first_name",
+  "last_name",
+  "address",
+  "birthdate",
+  "contact_number",
+  "civil_status",
+  "personal_email",
+  "work_email"
+];
+const employeeEmploymentRequiredFields = ["position", "account", "employee_type"];
+const employeeFieldLabels = {
+  first_name: "First name",
+  last_name: "Last name",
+  address: "Address",
+  birthdate: "Birthdate",
+  contact_number: "Contact number",
+  civil_status: "Civil status",
+  personal_email: "Personal email",
+  work_email: "Work email",
+  position: "Position",
+  account: "Account",
+  employee_type: "Employee type"
+};
 const hasDigitPattern = /\d/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const sanitizeEmployeeName = value => value.replace(/\d+/g, "");
 
 const formatDate = dateString => {
@@ -136,6 +161,45 @@ const mapEmployeeToForm = employee => ({
   employment_status: employee?.employment_status || "Active",
   date_hired: employee?.date_hired ?? ""
 });
+
+const getMissingEmployeeFields = (form, fields) =>
+  fields.filter(field => String(form?.[field] ?? "").trim() === "");
+
+const buildEmployeeSectionValidationMessage = (sectionLabel, missingFields) =>
+  `Please complete the ${sectionLabel} fields: ${missingFields.map(field => employeeFieldLabels[field]).join(", ")}.`;
+
+const validateEmployeePersonalSection = form => {
+  const missingFields = getMissingEmployeeFields(form, employeePersonalRequiredFields);
+  if (missingFields.length > 0) {
+    return buildEmployeeSectionValidationMessage("Personal Information", missingFields);
+  }
+
+  const contactNumber = String(form?.contact_number ?? "").trim();
+  if (!/^09\d{9}$/.test(contactNumber)) {
+    return "Contact number must start with 09 and be exactly 11 digits.";
+  }
+
+  const personalEmail = String(form?.personal_email ?? "").trim();
+  if (!emailPattern.test(personalEmail)) {
+    return "Personal email must be a valid email address.";
+  }
+
+  const workEmail = String(form?.work_email ?? "").trim();
+  if (!emailPattern.test(workEmail)) {
+    return "Work email must be a valid email address.";
+  }
+
+  return "";
+};
+
+const validateEmployeeEmploymentSection = form => {
+  const missingFields = getMissingEmployeeFields(form, employeeEmploymentRequiredFields);
+  if (missingFields.length > 0) {
+    return buildEmployeeSectionValidationMessage("Employment Details", missingFields);
+  }
+
+  return "";
+};
 
 export default function EmployeesSection() {
   const { hasPermission } = usePermissions();
@@ -236,6 +300,48 @@ export default function EmployeesSection() {
     setAddEmployeeForm(current => ({ ...current, [name]: value }));
   };
 
+  const handleOpenAddEmployeeModal = async () => {
+    if (!canAddEmployee) return;
+
+    const shouldOpen = await confirm({
+      title: "Add employee?",
+      message: "Open the add employee form?",
+      confirmLabel: "Yes"
+    });
+    if (!shouldOpen) return;
+
+    setAddEmployeeActiveTab("personal");
+    setAddEmployeeError("");
+    setAddEmployeeForm(initialEmployeeForm);
+    setIsAddingEmployee(false);
+    setIsAddEmployeeModalOpen(true);
+  };
+
+  const handleAddEmployeeTabChange = nextTab => {
+    if (nextTab === addEmployeeActiveTab) return;
+
+    if (nextTab === "employment" || nextTab === "benefits") {
+      const personalValidationMessage = validateEmployeePersonalSection(addEmployeeForm);
+      if (personalValidationMessage) {
+        setAddEmployeeError(personalValidationMessage);
+        setAddEmployeeActiveTab("personal");
+        return;
+      }
+    }
+
+    if ((addEmployeeActiveTab === "employment" && nextTab !== "employment") || nextTab === "benefits") {
+      const employmentValidationMessage = validateEmployeeEmploymentSection(addEmployeeForm);
+      if (employmentValidationMessage) {
+        setAddEmployeeError(employmentValidationMessage);
+        setAddEmployeeActiveTab("employment");
+        return;
+      }
+    }
+
+    setAddEmployeeError("");
+    setAddEmployeeActiveTab(nextTab);
+  };
+
   const handleCloseAddEmployeeModal = () => {
     setIsAddEmployeeModalOpen(false);
     setIsAddingEmployee(false);
@@ -248,10 +354,17 @@ export default function EmployeesSection() {
     event.preventDefault();
     if (!canAddEmployee || isAddingEmployee) return;
 
-    const phone = addEmployeeForm.contact_number;
+    const personalValidationMessage = validateEmployeePersonalSection(addEmployeeForm);
+    if (personalValidationMessage) {
+      setAddEmployeeError(personalValidationMessage);
+      setAddEmployeeActiveTab("personal");
+      return;
+    }
 
-    if (!/^09\d{9}$/.test(phone)) {
-      setAddEmployeeError("Contact number must start with 09 and be exactly 11 digits.");
+    const employmentValidationMessage = validateEmployeeEmploymentSection(addEmployeeForm);
+    if (employmentValidationMessage) {
+      setAddEmployeeError(employmentValidationMessage);
+      setAddEmployeeActiveTab("employment");
       return;
     }
 
@@ -340,6 +453,31 @@ export default function EmployeesSection() {
     setIsEditEmployeeModalOpen(true);
   };
 
+  const handleEditEmployeeTabChange = nextTab => {
+    if (nextTab === editEmployeeActiveTab) return;
+
+    if (nextTab === "employment") {
+      const personalValidationMessage = validateEmployeePersonalSection(editEmployeeForm);
+      if (personalValidationMessage) {
+        setEditEmployeeError(personalValidationMessage);
+        setEditEmployeeActiveTab("personal");
+        return;
+      }
+    }
+
+    if (editEmployeeActiveTab === "employment" && nextTab !== "employment") {
+      const employmentValidationMessage = validateEmployeeEmploymentSection(editEmployeeForm);
+      if (employmentValidationMessage) {
+        setEditEmployeeError(employmentValidationMessage);
+        setEditEmployeeActiveTab("employment");
+        return;
+      }
+    }
+
+    setEditEmployeeError("");
+    setEditEmployeeActiveTab(nextTab);
+  };
+
   const handleCloseEditEmployeeModal = () => {
     setIsEditEmployeeModalOpen(false);
     setEditingEmployeeId(null);
@@ -354,10 +492,17 @@ export default function EmployeesSection() {
 
     if (!canEditEmployee || isSavingEditEmployee || !editingEmployeeId) return;
 
-    const phone = editEmployeeForm.contact_number;
+    const personalValidationMessage = validateEmployeePersonalSection(editEmployeeForm);
+    if (personalValidationMessage) {
+      setEditEmployeeError(personalValidationMessage);
+      setEditEmployeeActiveTab("personal");
+      return;
+    }
 
-    if (!/^09\d{9}$/.test(phone)) {
-      setEditEmployeeError("Contact number must start with 09 and be exactly 11 digits.");
+    const employmentValidationMessage = validateEmployeeEmploymentSection(editEmployeeForm);
+    if (employmentValidationMessage) {
+      setEditEmployeeError(employmentValidationMessage);
+      setEditEmployeeActiveTab("employment");
       return;
     }
 
@@ -454,11 +599,7 @@ export default function EmployeesSection() {
           <button
             className="btn primary"
             type="button"
-            onClick={() => {
-              setAddEmployeeActiveTab("personal");
-              setAddEmployeeError("");
-              setIsAddEmployeeModalOpen(true);
-            }}
+            onClick={handleOpenAddEmployeeModal}
           >
             + Add Employee
           </button>
@@ -590,9 +731,9 @@ export default function EmployeesSection() {
             </div>
             <form className="modal-body add-employee-management-form" onSubmit={handleSubmitAddEmployee}>
               <div className="add-employee-tabs" role="tablist" aria-label="Add employee sections">
-                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "personal"} className={`add-employee-tab ${addEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("personal")}>Personal Information</button>
-                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "employment"} className={`add-employee-tab ${addEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("employment")}>Employment Details</button>
-                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "benefits"} className={`add-employee-tab ${addEmployeeActiveTab === "benefits" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("benefits")}>Benefit Details</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "personal"} className={`add-employee-tab ${addEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => handleAddEmployeeTabChange("personal")}>Personal Information</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "employment"} className={`add-employee-tab ${addEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => handleAddEmployeeTabChange("employment")}>Employment Details</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "benefits"} className={`add-employee-tab ${addEmployeeActiveTab === "benefits" ? "active" : ""}`} onClick={() => handleAddEmployeeTabChange("benefits")}>Benefit Details</button>
               </div>
 
               {addEmployeeActiveTab === "personal" && (
@@ -601,8 +742,8 @@ export default function EmployeesSection() {
                     <label className="form-field" htmlFor="employee-first-name"><input id="employee-first-name" name="first_name" placeholder="First Name" value={addEmployeeForm.first_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
                     <label className="form-field" htmlFor="employee-middle-name"><input id="employee-middle-name" name="middle_name" placeholder="Middle Name" value={addEmployeeForm.middle_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." /></label>
                     <label className="form-field add-employee-last-name" htmlFor="employee-last-name"><input id="employee-last-name" name="last_name" placeholder="Last Name" value={addEmployeeForm.last_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
-                    <label className="form-field add-employee-full-width" htmlFor="employee-address"><input id="employee-address" name="address" placeholder="Address" value={addEmployeeForm.address} onChange={handleAddEmployeeChange} /></label>
-                    <label className="form-field" htmlFor="employee-birthdate"><input id="employee-birthdate" type="date" name="birthdate" value={addEmployeeForm.birthdate} onChange={handleAddEmployeeChange} /></label>
+                    <label className="form-field add-employee-full-width" htmlFor="employee-address"><input id="employee-address" name="address" placeholder="Address" value={addEmployeeForm.address} onChange={handleAddEmployeeChange} required /></label>
+                    <label className="form-field" htmlFor="employee-birthdate"><input id="employee-birthdate" type="date" name="birthdate" value={addEmployeeForm.birthdate} onChange={handleAddEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="employee-contact-number">
                     <input
                         id="employee-contact-number"
@@ -614,14 +755,15 @@ export default function EmployeesSection() {
                         inputMode="numeric"
                         pattern="09[0-9]{9}"
                         title="Contact number must start with 09 and be 11 digits"
+                        required
                       />
                       </label>
                     <label className="form-field" htmlFor="employee-civil-status">
-                      <select id="employee-civil-status" name="civil_status" value={addEmployeeForm.civil_status} onChange={handleAddEmployeeChange}>
+                      <select id="employee-civil-status" name="civil_status" value={addEmployeeForm.civil_status} onChange={handleAddEmployeeChange} required>
                         <option value="">Civil Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option>
                       </select>
                     </label>
-                    <label className="form-field" htmlFor="employee-personal-email"><input id="employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={addEmployeeForm.personal_email} onChange={handleAddEmployeeChange} /></label>
+                    <label className="form-field" htmlFor="employee-personal-email"><input id="employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={addEmployeeForm.personal_email} onChange={handleAddEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="employee-work-email"><input id="employee-work-email" type="email" name="work_email" placeholder="Work Email" value={addEmployeeForm.work_email} onChange={handleAddEmployeeChange} required /></label>
                   </div>
                 </div>
@@ -631,7 +773,7 @@ export default function EmployeesSection() {
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
                     <label className="form-field" htmlFor="employee-position">
-                      <select id="employee-position" name="position" value={addEmployeeForm.position} onChange={handleAddEmployeeChange}>
+                      <select id="employee-position" name="position" value={addEmployeeForm.position} onChange={handleAddEmployeeChange} required>
                         <option value="">Select Position</option>
                         {employmentPositions.map(position => (
                           <option key={position} value={position}>{position}</option>
@@ -639,7 +781,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="employee-account">
-                      <select id="employee-account" name="account" value={addEmployeeForm.account} onChange={handleAddEmployeeChange}>
+                      <select id="employee-account" name="account" value={addEmployeeForm.account} onChange={handleAddEmployeeChange} required>
                         <option value="">Select Account</option>
                         {employmentAccounts.map(account => (
                           <option key={account} value={account}>{account}</option>
@@ -647,7 +789,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="employee-type">
-                      <select id="employee-type" name="employee_type" value={addEmployeeForm.employee_type} onChange={handleAddEmployeeChange}>
+                      <select id="employee-type" name="employee_type" value={addEmployeeForm.employee_type} onChange={handleAddEmployeeChange} required>
                         <option value="">Select Employee Type</option>
                         {employeeTypes.map(employeeType => (
                           <option key={employeeType} value={employeeType}>{employeeType}</option>
@@ -681,8 +823,8 @@ export default function EmployeesSection() {
             </div>
             <form className="modal-body add-employee-management-form" onSubmit={handleSubmitEditEmployee}>
               <div className="add-employee-tabs" role="tablist" aria-label="Edit employee sections">
-                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "personal"} className={`add-employee-tab ${editEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => setEditEmployeeActiveTab("personal")}>Personal Information</button>
-                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "employment"} className={`add-employee-tab ${editEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => setEditEmployeeActiveTab("employment")}>Employment Details</button>
+                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "personal"} className={`add-employee-tab ${editEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => handleEditEmployeeTabChange("personal")}>Personal Information</button>
+                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "employment"} className={`add-employee-tab ${editEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => handleEditEmployeeTabChange("employment")}>Employment Details</button>
               </div>
 
               {editEmployeeActiveTab === "personal" && (
@@ -691,8 +833,8 @@ export default function EmployeesSection() {
                     <label className="form-field" htmlFor="edit-employee-first-name"><input id="edit-employee-first-name" name="first_name" placeholder="First Name" value={editEmployeeForm.first_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
                     <label className="form-field" htmlFor="edit-employee-middle-name"><input id="edit-employee-middle-name" name="middle_name" placeholder="Middle Name" value={editEmployeeForm.middle_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." /></label>
                     <label className="form-field add-employee-last-name" htmlFor="edit-employee-last-name"><input id="edit-employee-last-name" name="last_name" placeholder="Last Name" value={editEmployeeForm.last_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
-                    <label className="form-field add-employee-full-width" htmlFor="edit-employee-address"><input id="edit-employee-address" name="address" placeholder="Address" value={editEmployeeForm.address} onChange={handleEditEmployeeChange} /></label>
-                    <label className="form-field" htmlFor="edit-employee-birthdate"><input id="edit-employee-birthdate" type="date" name="birthdate" value={editEmployeeForm.birthdate} onChange={handleEditEmployeeChange} /></label>
+                    <label className="form-field add-employee-full-width" htmlFor="edit-employee-address"><input id="edit-employee-address" name="address" placeholder="Address" value={editEmployeeForm.address} onChange={handleEditEmployeeChange} required /></label>
+                    <label className="form-field" htmlFor="edit-employee-birthdate"><input id="edit-employee-birthdate" type="date" name="birthdate" value={editEmployeeForm.birthdate} onChange={handleEditEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="edit-employee-contact-number">
                     <input
                       id="edit-employee-contact-number"
@@ -704,13 +846,14 @@ export default function EmployeesSection() {
                       inputMode="numeric"
                       pattern="09[0-9]{9}"
                       title="Contact number must start with 09 and be 11 digits"
+                      required
                     /></label>
                     <label className="form-field" htmlFor="edit-employee-civil-status">
-                      <select id="edit-employee-civil-status" name="civil_status" value={editEmployeeForm.civil_status} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-civil-status" name="civil_status" value={editEmployeeForm.civil_status} onChange={handleEditEmployeeChange} required>
                         <option value="">Civil Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option>
                       </select>
                     </label>
-                    <label className="form-field" htmlFor="edit-employee-personal-email"><input id="edit-employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={editEmployeeForm.personal_email} onChange={handleEditEmployeeChange} /></label>
+                    <label className="form-field" htmlFor="edit-employee-personal-email"><input id="edit-employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={editEmployeeForm.personal_email} onChange={handleEditEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="edit-employee-work-email"><input id="edit-employee-work-email" type="email" name="work_email" placeholder="Work Email" value={editEmployeeForm.work_email} onChange={handleEditEmployeeChange} required /></label>
                   </div>
                 </div>
@@ -720,7 +863,7 @@ export default function EmployeesSection() {
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
                     <label className="form-field" htmlFor="edit-employee-position">
-                      <select id="edit-employee-position" name="position" value={editEmployeeForm.position} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-position" name="position" value={editEmployeeForm.position} onChange={handleEditEmployeeChange} required>
                         <option value="">Select Position</option>
                         {employmentPositions.map(position => (
                           <option key={position} value={position}>{position}</option>
@@ -728,7 +871,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="edit-employee-account">
-                      <select id="edit-employee-account" name="account" value={editEmployeeForm.account} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-account" name="account" value={editEmployeeForm.account} onChange={handleEditEmployeeChange} required>
                         <option value="">Select Account</option>
                         {employmentAccounts.map(account => (
                           <option key={account} value={account}>{account}</option>
@@ -736,7 +879,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="edit-employee-type">
-                      <select id="edit-employee-type" name="employee_type" value={editEmployeeForm.employee_type} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-type" name="employee_type" value={editEmployeeForm.employee_type} onChange={handleEditEmployeeChange} required>
                         <option value="">Select Employee Type</option>
                         {employeeTypes.map(employeeType => (
                           <option key={employeeType} value={employeeType}>{employeeType}</option>
