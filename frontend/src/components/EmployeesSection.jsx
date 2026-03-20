@@ -201,6 +201,39 @@ const validateEmployeeEmploymentSection = form => {
   return "";
 };
 
+const employeeTableColumns = [
+  { key: "id", label: "ID", sortable: true },
+  { key: "fullname", label: "Name", sortable: true },
+  { key: "position", label: "Position", sortable: true },
+  { key: "account", label: "Account", sortable: true },
+  { key: "employee_type", label: "Type", sortable: true },
+  { key: "employment_status", label: "Status", sortable: true },
+  { key: "date_hired", label: "Hired", sortable: true },
+  { key: "info", label: "Info", sortable: false },
+  { key: "actions", label: "Actions", sortable: false, className: "employee-actions-cell" }
+];
+
+const getEmployeeSortValue = (employee, sortKey) => {
+  if (sortKey === "id") return Number(employee?.id ?? 0);
+
+  if (sortKey === "date_hired") {
+    const timestamp = new Date(employee?.date_hired ?? "").getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
+
+  return String(employee?.[sortKey] ?? "").trim().toLowerCase();
+};
+
+const compareEmployeeValues = (leftValue, rightValue, direction) => {
+  const multiplier = direction === "asc" ? 1 : -1;
+
+  if (typeof leftValue === "number" && typeof rightValue === "number") {
+    return (leftValue - rightValue) * multiplier;
+  }
+
+  return leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: "base" }) * multiplier;
+};
+
 export default function EmployeesSection() {
   const { hasPermission } = usePermissions();
   const { confirm, showMessage, showToast } = useFeedback();
@@ -212,6 +245,11 @@ export default function EmployeesSection() {
   const [employees, setEmployees] = useState([]);
   const [employeeError, setEmployeeError] = useState("");
   const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
+  const [employeeSortKey, setEmployeeSortKey] = useState("id");
+  const [employeeSortDirection, setEmployeeSortDirection] = useState("desc");
+  const [employeeRowsPerPageInput, setEmployeeRowsPerPageInput] = useState("10");
+  const [employeeCurrentPage, setEmployeeCurrentPage] = useState(1);
 
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
@@ -266,11 +304,40 @@ export default function EmployeesSection() {
     fetchEmployees();
   }, [fetchEmployees]);
 
+  useEffect(() => {
+    setEmployeeCurrentPage(1);
+  }, [employeeSearchTerm, employeeRowsPerPageInput]);
+
   const handleEmployeeNameKeyDown = event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key.length === 1 && hasDigitPattern.test(event.key)) {
       event.preventDefault();
     }
+  };
+
+  const handleEmployeeSort = sortKey => {
+    if (employeeSortKey === sortKey) {
+      setEmployeeSortDirection(current => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setEmployeeSortKey(sortKey);
+    setEmployeeSortDirection(sortKey === "id" || sortKey === "date_hired" ? "desc" : "asc");
+  };
+
+  const handleEmployeeRowsPerPageChange = event => {
+    const digitsOnly = event.target.value.replace(/\D/g, "");
+    setEmployeeRowsPerPageInput(digitsOnly);
+  };
+
+  const handleEmployeeRowsPerPageBlur = () => {
+    const parsedValue = Number.parseInt(employeeRowsPerPageInput, 10);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      setEmployeeRowsPerPageInput("10");
+      return;
+    }
+
+    setEmployeeRowsPerPageInput(String(parsedValue));
   };
 
   const handleAddEmployeeChange = event => {
@@ -588,12 +655,61 @@ export default function EmployeesSection() {
     }
   };
 
+  const normalizedEmployeeSearchTerm = employeeSearchTerm.trim().toLowerCase();
+  const parsedEmployeeRowsPerPage = Number.parseInt(employeeRowsPerPageInput, 10);
+  const employeeRowsPerPage = Number.isFinite(parsedEmployeeRowsPerPage) && parsedEmployeeRowsPerPage > 0
+    ? parsedEmployeeRowsPerPage
+    : 10;
+
+  const filteredEmployees = employees.filter(employee => {
+    if (!normalizedEmployeeSearchTerm) return true;
+
+    const searchableValues = [
+      employee.id,
+      employee.fullname,
+      employee.email,
+      employee.position,
+      employee.account,
+      employee.employee_type,
+      employee.employment_status,
+      employee.contact_number
+    ];
+
+    return searchableValues.some(value =>
+      String(value ?? "").toLowerCase().includes(normalizedEmployeeSearchTerm)
+    );
+  });
+
+  const sortedEmployees = [...filteredEmployees].sort((leftEmployee, rightEmployee) => {
+    const leftValue = getEmployeeSortValue(leftEmployee, employeeSortKey);
+    const rightValue = getEmployeeSortValue(rightEmployee, employeeSortKey);
+    const comparison = compareEmployeeValues(leftValue, rightValue, employeeSortDirection);
+
+    if (comparison !== 0) return comparison;
+    return Number(rightEmployee?.id ?? 0) - Number(leftEmployee?.id ?? 0);
+  });
+
+  const employeeTotalPages = Math.max(1, Math.ceil(sortedEmployees.length / employeeRowsPerPage));
+  const employeeSafeCurrentPage = Math.min(employeeCurrentPage, employeeTotalPages);
+  const employeePageStartIndex = (employeeSafeCurrentPage - 1) * employeeRowsPerPage;
+  const paginatedEmployees = sortedEmployees.slice(employeePageStartIndex, employeePageStartIndex + employeeRowsPerPage);
+  const employeeVisibleStart = sortedEmployees.length === 0 ? 0 : employeePageStartIndex + 1;
+  const employeeVisibleEnd = Math.min(employeePageStartIndex + employeeRowsPerPage, sortedEmployees.length);
+
+  useEffect(() => {
+    if (employeeCurrentPage !== employeeSafeCurrentPage) {
+      setEmployeeCurrentPage(employeeSafeCurrentPage);
+    }
+  }, [employeeCurrentPage, employeeSafeCurrentPage]);
+
   return (
     <section className="content">
       <div className="employee-list-toolbar">
         <div>
           <div className="section-title">EMPLOYEE LIST</div>
-          <div className="employee-list-count">{employees.length} Employees</div>
+          <div className="employee-list-count">
+            {normalizedEmployeeSearchTerm ? `${filteredEmployees.length} of ${employees.length} Employees` : `${employees.length} Employees`}
+          </div>
         </div>
         {canAddEmployee ? (
           <button
@@ -606,6 +722,32 @@ export default function EmployeesSection() {
         ) : null}
       </div>
 
+      <div className="employee-list-controls">
+        <label className="employee-search-field" htmlFor="employee-search">
+          <span className="employee-control-label">Search</span>
+          <input
+            id="employee-search"
+            type="search"
+            placeholder="Search name, email, position, account..."
+            value={employeeSearchTerm}
+            onChange={event => setEmployeeSearchTerm(event.target.value)}
+          />
+        </label>
+
+        <label className="employee-rows-field" htmlFor="employee-rows-per-page">
+          <span className="employee-control-label">Rows per page</span>
+          <input
+            id="employee-rows-per-page"
+            type="text"
+            inputMode="numeric"
+            placeholder="10"
+            value={employeeRowsPerPageInput}
+            onChange={handleEmployeeRowsPerPageChange}
+            onBlur={handleEmployeeRowsPerPageBlur}
+          />
+        </label>
+      </div>
+
       {employeeError && <div className="error">{employeeError}</div>}
 
       {!canViewEmployeeList ? (
@@ -614,20 +756,32 @@ export default function EmployeesSection() {
         <div className="empty-state">Loading employees...</div>
       ) : employees.length === 0 ? (
         <div className="empty-state">No employees found.</div>
+      ) : filteredEmployees.length === 0 ? (
+        <div className="empty-state">No matching employees found.</div>
       ) : (
-        <div className="table-card">
+        <div className="table-card employee-table-card">
           <div className="table-header employee-list-header">
-            <div>ID</div>
-            <div>Name</div>
-            <div>Position</div>
-            <div>Account</div>
-            <div>Type</div>
-            <div>Status</div>
-            <div>Hired</div>
-            <div>Info</div>
-            <div className="employee-actions-cell">Actions</div>
+            {employeeTableColumns.map(column => (
+              <div key={column.key} className={column.className ?? ""}>
+                {column.sortable ? (
+                  <button
+                    className="employee-sort-button"
+                    type="button"
+                    onClick={() => handleEmployeeSort(column.key)}
+                    aria-label={`Sort by ${column.label}`}
+                  >
+                    <span>{column.label}</span>
+                    <span className="employee-sort-indicator" aria-hidden="true">
+                      {employeeSortKey === column.key ? (employeeSortDirection === "asc" ? "^" : "v") : "-"}
+                    </span>
+                  </button>
+                ) : (
+                  <span>{column.label}</span>
+                )}
+              </div>
+            ))}
           </div>
-          {employees.map(employee => (
+          {paginatedEmployees.map(employee => (
             <div key={employee.id} className="table-row employee-list-row">
               <div className="table-cell">{employee.id}</div>
               <div className="table-cell">{employee.fullname || "—"}</div>
@@ -661,6 +815,32 @@ export default function EmployeesSection() {
               </div>
             </div>
           ))}
+          <div className="employee-table-pagination">
+            <div className="employee-pagination-summary">
+              Showing {employeeVisibleStart}-{employeeVisibleEnd} of {sortedEmployees.length}
+            </div>
+            <div className="employee-pagination-actions">
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => setEmployeeCurrentPage(current => Math.max(1, current - 1))}
+                disabled={employeeSafeCurrentPage === 1}
+              >
+                Previous
+              </button>
+              <div className="employee-pagination-page">
+                Page {employeeSafeCurrentPage} of {employeeTotalPages}
+              </div>
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => setEmployeeCurrentPage(current => Math.min(employeeTotalPages, current + 1))}
+                disabled={employeeSafeCurrentPage === employeeTotalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
