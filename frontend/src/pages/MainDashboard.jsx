@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createAnnouncement, fetchAnnouncements } from "../api/announcement";
 import "../styles/MainDashboard.css";
 
 function DashboardHeader({ headerTime, headerDate }) {
@@ -42,14 +43,55 @@ function TimeCard({
   );
 }
 
-function AnnouncementCard({ canEdit = true }) {
+function AnnouncementCard({
+  canEdit = true,
+  announcements = [],
+  isLoading = false,
+  errorMessage = "",
+  onCreateAnnouncement = null
+}) {
   return (
     <div className="card announcement-card">
       <div className="card-top">
         <span>Announcement</span>
-        {canEdit ? <button type="button" className="pill-btn">+ Announcement</button> : null}
+        {canEdit ? (
+          <button
+            type="button"
+            className="pill-btn"
+            onClick={onCreateAnnouncement}
+          >
+            + Announcement
+          </button>
+        ) : null}
       </div>
-      <ul className="list-items announcement-list" aria-label="No announcements yet" />
+      <ul
+        className="list-items announcement-list"
+        aria-label={announcements.length > 0 ? "Announcements" : "No announcements yet"}
+      >
+        {isLoading ? (
+          <li className="announcement-empty-state">Loading announcements...</li>
+        ) : errorMessage ? (
+          <li className="announcement-empty-state">{errorMessage}</li>
+        ) : announcements.length > 0 ? (
+          announcements.map(announcement => (
+            <li
+              key={announcement.announcement_id}
+              className="announcement-item announcement-item-stacked"
+            >
+              <div className="announcement-title-row">
+                <div className="announcement-title">{announcement.title}</div>
+                <div className="announcement-meta">{announcement.date_posted}</div>
+              </div>
+              <div className="announcement-content">{announcement.content}</div>
+              <div className="announcement-meta">
+                Posted by {announcement.posted_by_name || "Unknown"}
+              </div>
+            </li>
+          ))
+        ) : (
+          <li className="announcement-empty-state">No announcements yet.</li>
+        )}
+      </ul>
       <div className="mini-actions">{canEdit ? "✎\u00A0\u00A0" : null}◷</div>
     </div>
   );
@@ -244,10 +286,46 @@ export default function MainDashboard({
   const [now, setNow] = useState(new Date());
   const [isTimeOutConfirmOpen, setIsTimeOutConfirmOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState(new Date());
+  const [announcements, setAnnouncements] = useState([]);
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true);
+  const [announcementError, setAnnouncementError] = useState("");
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementContent, setAnnouncementContent] = useState("");
+  const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
+  const [announcementFormError, setAnnouncementFormError] = useState("");
+
+  const loadAnnouncements = async () => {
+    setIsLoadingAnnouncements(true);
+    setAnnouncementError("");
+
+    try {
+      const response = await fetchAnnouncements();
+      setAnnouncements(Array.isArray(response?.announcements) ? response.announcements : []);
+    } catch (error) {
+      setAnnouncements([]);
+      setAnnouncementError(error?.error || "Unable to load announcements.");
+    } finally {
+      setIsLoadingAnnouncements(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadAnnouncements().catch(() => {
+      if (isMounted) {
+        setAnnouncementError("Unable to load announcements.");
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const activeTimeIn = attendanceControls?.timeInAt ?? timeInStart;
@@ -349,6 +427,46 @@ export default function MainDashboard({
     setDisplayDate(prevDate => new Date(prevDate.getFullYear(), prevDate.getMonth() + 1, 1));
   };
 
+  const handleOpenAnnouncementModal = () => {
+    setAnnouncementFormError("");
+    setIsAnnouncementModalOpen(true);
+  };
+
+  const handleCloseAnnouncementModal = () => {
+    setIsAnnouncementModalOpen(false);
+    setAnnouncementTitle("");
+    setAnnouncementContent("");
+    setAnnouncementFormError("");
+  };
+
+  const handleCreateAnnouncement = async event => {
+    event.preventDefault();
+
+    const trimmedTitle = announcementTitle.trim();
+    const trimmedContent = announcementContent.trim();
+
+    if (!trimmedTitle || !trimmedContent) {
+      setAnnouncementFormError("Title and content are required.");
+      return;
+    }
+
+    setIsSavingAnnouncement(true);
+    setAnnouncementFormError("");
+
+    try {
+      await createAnnouncement({
+        title: trimmedTitle,
+        content: trimmedContent
+      });
+      await loadAnnouncements();
+      handleCloseAnnouncementModal();
+    } catch (error) {
+      setAnnouncementFormError(error?.error || "Unable to create announcement.");
+    } finally {
+      setIsSavingAnnouncement(false);
+    }
+  };
+
   return (
     <>
       <DashboardHeader
@@ -367,7 +485,13 @@ export default function MainDashboard({
           hasScheduleToday={hasScheduleToday}
           hasCompletedShift={hasCompletedShift}
         />
-        <AnnouncementCard canEdit={canEditCards} />
+        <AnnouncementCard
+          canEdit={canEditCards}
+          announcements={announcements}
+          isLoading={isLoadingAnnouncements}
+          errorMessage={announcementError}
+          onCreateAnnouncement={handleOpenAnnouncementModal}
+        />
         <ShiftCard schedule={schedule} dashboardMeta={dashboardMeta} />
         <CalendarCard 
           calendarData={calendarData} 
@@ -402,6 +526,56 @@ export default function MainDashboard({
                 Confirm Time Out
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAnnouncementModalOpen ? (
+        <div className="time-out-modal-backdrop" role="presentation">
+          <div
+            className="time-out-modal announcement-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="announcement-modal-title"
+          >
+            <h3 id="announcement-modal-title">Create Announcement</h3>
+            <form onSubmit={handleCreateAnnouncement} className="announcement-form">
+              <label className="announcement-form-field">
+                <span>Title</span>
+                <input
+                  type="text"
+                  value={announcementTitle}
+                  onChange={event => setAnnouncementTitle(event.target.value)}
+                  maxLength={100}
+                  disabled={isSavingAnnouncement}
+                />
+              </label>
+              <label className="announcement-form-field">
+                <span>Content</span>
+                <textarea
+                  value={announcementContent}
+                  onChange={event => setAnnouncementContent(event.target.value)}
+                  rows={5}
+                  disabled={isSavingAnnouncement}
+                />
+              </label>
+              {announcementFormError ? (
+                <p className="announcement-form-error">{announcementFormError}</p>
+              ) : null}
+              <div className="time-out-modal-actions">
+                <button
+                  type="button"
+                  className="time-out-cancel-btn"
+                  onClick={handleCloseAnnouncementModal}
+                  disabled={isSavingAnnouncement}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="time-out-confirm-btn" disabled={isSavingAnnouncement}>
+                  {isSavingAnnouncement ? "Saving..." : "Post Announcement"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}
