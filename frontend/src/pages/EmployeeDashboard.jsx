@@ -26,6 +26,7 @@ export default function EmployeeDashboard() {
     canViewDashboard,
     canViewTeam,
     canViewAttendance,
+    canSetAttendance,
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
@@ -313,7 +314,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeIn = async () => {
-    if (!hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
+    if (!canSetAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
     if (attendanceLog.timeInAt && !attendanceLog.timeOutAt) return;
 
     const now = new Date();
@@ -340,7 +341,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeOut = async () => {
-    if (!hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
+    if (!canSetAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
     if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
 
     const nextAttendance = {
@@ -387,8 +388,8 @@ export default function EmployeeDashboard() {
   const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
   const hasTimedOutToday = isSameCalendarDay(attendanceLog.timeOutAt, new Date());
   const hasCompletedShift = hasTimedOutToday && !hasActiveTimeIn;
-  const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn && !isSavingAttendance;
-  const canClickTimeOut = canUseAttendanceControls && hasActiveTimeIn && !isSavingAttendance;
+  const canClickTimeIn = canSetAttendance && canUseAttendanceControls && !hasActiveTimeIn && !isSavingAttendance;
+  const canClickTimeOut = canSetAttendance && canUseAttendanceControls && hasActiveTimeIn && !isSavingAttendance;
   const breakTimeToday = todaySchedule
     ? formatBreakTimeRange(
         todaySchedule.breakStartTime,
