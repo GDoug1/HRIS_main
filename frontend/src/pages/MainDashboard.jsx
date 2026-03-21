@@ -346,7 +346,7 @@ export default function MainDashboard({
   const hasActiveTimeIn = Boolean(activeTimeIn && !activeTimeOut);
   const hasScheduleToday = Boolean(getTodayShiftSchedule(schedule));
   const canClickTimeIn = attendanceControls?.canClickTimeIn ?? (hasScheduleToday && !hasActiveTimeIn && !hasCompletedShift);
-  const canClickTimeOut = attendanceControls?.canClickTimeOut ?? (hasScheduleToday && hasActiveTimeIn && !hasCompletedShift);
+  const canClickTimeOut = attendanceControls?.canClickTimeOut ?? (hasActiveTimeIn && !hasCompletedShift);
   const canToggleTimeIn = hasActiveTimeIn ? canClickTimeOut : canClickTimeIn;
 
   const counterDisplay = useMemo(() => {
@@ -410,7 +410,7 @@ export default function MainDashboard({
   };
 
   const onToggleTimeIn = () => {
-    if (!hasScheduleToday || hasCompletedShift) {
+    if (hasCompletedShift) {
       return;
     }
 
@@ -419,7 +419,16 @@ export default function MainDashboard({
         setIsTimeOutConfirmOpen(true);
         return;
       }
+
+      if (!hasScheduleToday) {
+        return;
+      }
+
       attendanceControls.onTimeIn();
+      return;
+    }
+
+    if (!hasScheduleToday) {
       return;
     }
 

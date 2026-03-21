@@ -741,7 +741,7 @@ export default function CoachDashboard() {
   };
 
   const handleCoachTimeOut = async () => {
-    if (!canSetAttendance || !dashboardCluster?.id || !todayCoachSchedule || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    if (!canSetAttendance || !dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
     await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
   };
 
@@ -1554,7 +1554,7 @@ export default function CoachDashboard() {
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
                 canClickTimeIn: canSetAttendance && Boolean(dashboardCluster?.id) && Boolean(todayCoachSchedule) && !hasActiveTimeIn,
-                canClickTimeOut: canSetAttendance && Boolean(todayCoachSchedule) && hasActiveTimeIn,
+                canClickTimeOut: canSetAttendance && Boolean(dashboardCluster?.id) && hasActiveTimeIn,
                 hasCompletedShift,
                 onTimeIn: handleCoachTimeIn,
                 onTimeOut: handleCoachTimeOut
