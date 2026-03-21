@@ -792,10 +792,6 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "Team" && canViewTeam ? (
           <>
             <header className="topbar">
-              <div>
-                <h2>TEAM</h2>
-                <div className="section-title">Admin Dashboard</div>
-              </div>
               <span className="datetime">{dateTimeLabel}</span>
             </header>
 

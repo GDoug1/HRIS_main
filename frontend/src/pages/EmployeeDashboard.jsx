@@ -466,23 +466,6 @@ export default function EmployeeDashboard() {
       />
 
       <main className="main">
-        <header className="topbar">
-          <div>
-            <h2>{activeNav.toUpperCase()}</h2>
-            <div className="section-title">
-              {activeNav === "Dashboard"
-                ? "Employee time tracking"
-                : activeNav === "My Attendance"
-                  ? "Attendance history"
-                  : activeNav === "My Requests"
-                    ? "My requests"
-                    : activeNav === "My Filing Center"
-                      ? "My filing center"
-                      : "My team cluster overview"}
-            </div>
-          </div>
-          <span className="datetime">{dateTimeLabel}</span>
-        </header>
 
         <section className="content content-muted">
             {activeNav === "Dashboard" && canViewDashboard && (

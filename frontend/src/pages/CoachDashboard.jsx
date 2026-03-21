@@ -1843,10 +1843,6 @@ export default function CoachDashboard() {
         ) : (
           <>
         <header className="topbar">
-          <div>
-            <h2>DASHBOARD</h2>
-            <div className="nav-item">Team Coach Dashboard</div>
-          </div>
           <div className="toolbar">
             <span className="datetime">{dateTimeLabel}</span>
            {clusters.length === 0 && (
