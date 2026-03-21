@@ -472,6 +472,12 @@ body {
   color: #374151;
 }
 
+.employee-card-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
 .employee-card-body {
   display: grid;
   gap: 14px;
