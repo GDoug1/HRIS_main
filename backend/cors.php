@@ -14,4 +14,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     exit();
 }
 
+if (session_status() === PHP_SESSION_NONE) {
+    // Session Cookie Security for Cross-Domain (Vercel to Heliohost)
+    if ($origin !== '' && !str_contains($origin, 'localhost')) {
+        session_set_cookie_params([
+            'samesite' => 'None',
+            'secure' => true,
+            'httponly' => true
+        ]);
+    }
+    session_start();
+}
+
 header("Content-Type: application/json");

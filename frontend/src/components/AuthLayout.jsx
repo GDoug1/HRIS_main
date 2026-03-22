@@ -4,8 +4,7 @@ export default function AuthLayout({
   highlights,
   children,
   supportContent,
-  showPanel = true,
-  className = ""
+  showPanel = true
 }) {
   return (
     <div className="auth-page">

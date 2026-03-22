@@ -75,7 +75,6 @@ export default function EmployeeDashboard() {
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
   const activeCluster = data[0];
-  const dateTimeLabel = useLiveDateTime();
 
 
   useEffect(() => {

@@ -38,14 +38,10 @@ function getEditablePermissionOptions(roleName, permissionOptions) {
 
 function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions, onClose, onSave, isSaving = false, errorMessage = "" }) {
   const [draftPermissionIds, setDraftPermissionIds] = useState(selectedPermissionIds);
-  const selectedPermissionKey = useMemo(
-    () => [...selectedPermissionIds].sort((a, b) => a - b).join(","),
-    [selectedPermissionIds]
-  );
 
   useEffect(() => {
     setDraftPermissionIds(selectedPermissionIds);
-  }, [selectedPermissionKey]);
+  }, [selectedPermissionIds]);
 
   const togglePermission = permissionId => {
     setDraftPermissionIds(current => {

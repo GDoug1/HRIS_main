@@ -159,18 +159,6 @@ export default function AdminDashboard() {
     };
   }, [coachAttendance]);
 
-  const persistAttendance = async (nextAttendance) => {
-    setIsSavingAttendance(true);
-    try {
-      const savedAttendance = await saveAdminDashboardAttendance({ nextAttendance });
-      setAttendanceLog(savedAttendance);
-    } catch (error) {
-      console.error("Failed to persist admin attendance:", error);
-    } finally {
-      setIsSavingAttendance(false);
-    }
-  };
-
   const handleAdminTimeIn = async () => {
     if (attendanceLog.timeInAt && !attendanceLog.timeOutAt) return;
     const now = new Date();
