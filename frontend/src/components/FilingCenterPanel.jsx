@@ -18,6 +18,7 @@ const getTomorrowDateInputValue = () => {
 export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave" }) {
   const { confirm } = useFeedback();
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [clusterInfo, setClusterInfo] = useState(null);
   const [disputeType, setDisputeType] = useState("Time Correction");
   const [leaveType, setLeaveType] = useState("Sick Leave");
   const [leaveStartDate, setLeaveStartDate] = useState("");
@@ -31,12 +32,28 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const [leavePhoto, setLeavePhoto] = useState(null);
   const [leavePhotoInputKey, setLeavePhotoInputKey] = useState(0);
   const [message, setMessage] = useState("");
+  const [agreement, setAgreement] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    // Fetch cluster info to show context
+    const fetchClusterContext = async () => {
+      try {
+        const data = await apiFetch("api/employee/employee_clusters.php");
+        if (Array.isArray(data) && data.length > 0) {
+          setClusterInfo(data[0]);
+        }
+      } catch (error) {
+        console.error("Failed to load cluster context:", error);
+      }
+    };
+    fetchClusterContext();
+  }, []);
 
   const todayDate = useMemo(() => getTodayDateInputValue(), []);
   const tomorrowDate = useMemo(() => getTomorrowDateInputValue(), []);
@@ -57,10 +74,11 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
     setDisputeDate("");
     setLeavePhoto(null);
     setLeavePhotoInputKey(prev => prev + 1);
+    setAgreement(false);
   };
 
   const handleSubmit = async () => {
-    if (submitting) return;
+    if (submitting || !agreement) return;
     setMessage("");
 
     const hasConfirmedSubmission = await confirm({
@@ -158,6 +176,11 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
           <header className="filing-center-panel-header">{panelTitle}</header>
 
           <div className="filing-center-panel-body">
+            {clusterInfo && (
+              <div className="filing-context-banner">
+                Filing as member of <strong>{clusterInfo.cluster_name || "Unknown Cluster"}</strong> under Coach <strong>{clusterInfo.coach_name || "Unknown Coach"}</strong>
+              </div>
+            )}
             {activeTab === "leave" && (
               <>
                 <label className="filing-field filing-field-full">
@@ -250,8 +273,24 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
               <textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="Provide a detailed explanation for your request..." rows={4} />
             </label>
 
+            <div className="filing-agreement-container">
+              <label className="filing-agreement">
+                <input
+                  type="checkbox"
+                  checked={agreement}
+                  onChange={event => setAgreement(event.target.checked)}
+                />
+                <span>I certify that the information provided is true and correct to the best of my knowledge.</span>
+              </label>
+            </div>
+
             {message ? <div className="form-hint">{message}</div> : null}
-            <button type="button" className="filing-submit-btn" onClick={handleSubmit} disabled={submitting}>
+            <button
+              type="button"
+              className="filing-submit-btn"
+              onClick={handleSubmit}
+              disabled={submitting || !agreement}
+            >
               {submitting ? "Submitting..." : "Submit Request"}
             </button>
           </div>
