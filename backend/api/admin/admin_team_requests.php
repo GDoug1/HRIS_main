@@ -133,7 +133,6 @@ $employeeDetailsJoinSql = '';
 
 $employeeNameColumns = array_values(array_filter([
     in_array('first_name', $employeeColumns, true) ? 'requester_employee.first_name' : null,
-    in_array('middle_name', $employeeColumns, true) ? 'requester_employee.middle_name' : null,
     in_array('last_name', $employeeColumns, true) ? 'requester_employee.last_name' : null,
 ]));
 
