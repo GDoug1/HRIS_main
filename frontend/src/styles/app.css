@@ -2413,6 +2413,33 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
+}
+
+.action-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
+}
+
+.action-icon-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.action-icon-btn.primary {
+  background: #16a34a !important;
+  border-color: #15803d !important;
+}
+
+.action-icon-btn.secondary {
+  background: #dc2626 !important;
+  border-color: #b91c1c !important;
+  color: #fff !important;
 }
 
 .employee-request-actions .btn,

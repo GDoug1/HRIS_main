@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
 
 const normalizeRequestDetails = value => {
@@ -45,7 +46,7 @@ const formatDateTimeLabel = value => {
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString([], {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit"
@@ -59,7 +60,7 @@ const formatRequestActionDate = value => {
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString([], {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit"
@@ -72,7 +73,7 @@ const formatAttendanceDate = value => {
   if (Number.isNaN(parsed.getTime())) return "—";
   return parsed.toLocaleDateString([], {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric"
   });
 };
@@ -386,13 +387,13 @@ export default function DataPanel({
             role="row"
           >
             <span role="columnheader">Date Filed</span>
+            {personField && <span role="columnheader">{personLabel}</span>}
             <span role="columnheader">Request Type</span>
             <span role="columnheader">Details</span>
             <span role="columnheader">Schedule / Period</span>
             <span role="columnheader">Status</span>
             {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
             {showRequestActionBy && <span role="columnheader">Accepted / Rejected Date</span>}
-            {personField && <span role="columnheader">{personLabel}</span>}
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
 
@@ -406,6 +407,12 @@ export default function DataPanel({
                 role="row"
               >
                 <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
+                {personField && (
+                  <span role="cell" className="team-attendance-employee-cell">
+                    <span>{getPersonPrimaryValue(item, personField)}</span>
+                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+                  </span>
+                )}
                 <span role="cell">{item.request_type ?? "—"}</span>
                 <span role="cell">
                   <div className="employee-request-details-cell">
@@ -447,12 +454,6 @@ export default function DataPanel({
                     {formatRequestActionDate(item.request_action_at)}
                   </span>
                 )}
-                {personField && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, personField)}</span>
-                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-                  </span>
-                )}
                 {onRequestAction && (
                   <span role="cell" className="employee-request-actions-cell">
                     <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
@@ -472,12 +473,19 @@ export default function DataPanel({
                         return (
                           <button
                             key={`${item.id}-${action.status}`}
-                            className={action.variant ?? "btn"}
+                            className={`${action.variant ?? "btn"} action-icon-btn`}
                             type="button"
+                            title={action.label}
                             disabled={requestActionLoadingId === item.id || !isEnabled}
                             onClick={() => onRequestAction(item, action.status)}
                           >
-                            {requestActionLoadingId === item.id ? "Saving..." : action.label}
+                            {requestActionLoadingId === item.id ? (
+                              "…"
+                            ) : action.status === "Approved" ? (
+                              <CheckCircle2 size={18} />
+                            ) : (
+                              <XCircle size={18} />
+                            )}
                           </button>
                         );
                       })}
