@@ -74,8 +74,12 @@ function getClusterMemberEmployeeReference(mysqli $conn): ?string {
 }
 
 
-function resolveLeavePhotoSelect(mysqli $conn): string {
-    $columns = getColumns($conn, 'leave_requests');
+function resolvePhotoSelect(mysqli $conn, string $table): string {
+    if (!hasTable($conn, $table)) {
+        return "NULL AS photo_path";
+    }
+
+    $columns = getColumns($conn, $table);
     foreach (['photo_path', 'photo_url', 'attachment_path', 'supporting_photo'] as $column) {
         if (in_array($column, $columns, true)) {
             return "req.$column AS photo_path";
@@ -141,17 +145,17 @@ if ($usersIdColumn !== null && $userDisplayColumn !== null) {
     }
 }
 
-$leavePhotoSelect = resolveLeavePhotoSelect($conn);
-
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, $excludeRequesterCondition, $requestEmployeeReference, $sessionUserId, $currentEmployeeId, $leavePhotoSelect, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, $excludeRequesterCondition, $requestEmployeeReference, $sessionUserId, $currentEmployeeId, &$items) {
+    $photoSelect = resolvePhotoSelect($conn, $table);
+
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
                 req.$typeColumn AS request_type,
                 req.$detailsColumn AS details,
-                $leavePhotoSelect,
+                $photoSelect,
                 $scheduleExpr AS schedule_period,
                 req.status,
                 $requestEmployeeExpr AS employee_id,
