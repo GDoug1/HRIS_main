@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { CheckCircle2, XCircle, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
 import { formatDateTime } from "../utils/dateUtils";
@@ -36,7 +36,7 @@ const panelConfig = {
     title: "My Requests",
     filterLabel: "Filter Type",
     searchPlaceholder: "Search requests, reasons, status...",
-    columns: ["Date Filed", "Request Type", "Details", "Schedule / Period", "Status", "Actions"],
+    columns: ["Date Filed", "Filed By", "Request Type", "Details", "Schedule / Period", "Status", "Endorsed By", "Approved By", "Actions"],
     messageTitle: "Unable to load requests",
     messageSubtitle: "Please try again in a few moments."
   }
@@ -128,7 +128,6 @@ export default function DataPanel({
   requestActionLoadingId = "",
   requestActions = null,
   enableRequestFilters = false,
-  showRequestActionBy = false,
 }) {
   const { confirm } = useFeedback();
   const config = panelConfig[type] ?? panelConfig.attendance;
@@ -158,7 +157,7 @@ export default function DataPanel({
     }
   };
 
-  const getSortValue = (item, key) => {
+  const getSortValue = useCallback((item, key) => {
     if (type === "attendance") {
       if (key === "Date") return new Date(item.time_in_at ?? item.time_out_at ?? 0).getTime();
       if (key === "Time In") return new Date(item.time_in_at ?? 0).getTime();
@@ -177,7 +176,7 @@ export default function DataPanel({
       return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
     }
     return "";
-  };
+  }, [type, personField, personLabel]);
 
   const handleActionClick = async (item, action) => {
     if (!onRequestAction) return;
@@ -302,7 +301,7 @@ export default function DataPanel({
     }
 
     return result;
-  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter, sortKey, sortDirection]);
+  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter, sortKey, sortDirection, getSortValue]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedRecords.length / rowsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -454,6 +453,12 @@ export default function DataPanel({
   }
 
   if (type === "requests") {
+    const requestColumnCount = 7 + (personField ? 1 : 0) + (onRequestAction ? 1 : 0);
+    const requestGridStyle = {
+      gridTemplateColumns: `minmax(170px, 1.2fr) ${personField ? 'minmax(140px, 1fr) ' : ''}minmax(180px, 1fr) minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(150px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr)${onRequestAction ? ' minmax(190px, 1fr)' : ''}`,
+      minWidth: `${requestColumnCount * 160}px`
+    };
+
     return (
       <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
         <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
@@ -512,15 +517,16 @@ export default function DataPanel({
 
         <div className="employee-attendance-history-scroll">
           <div
-            className={`employee-attendance-history-header ${showRequestActionBy ? "employee-attendance-history-header-actor" : ""} ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
+            className={`employee-attendance-history-header ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
             role="row"
+            style={requestGridStyle}
           >
             <span role="columnheader">
               <SortableHeader label="Date Filed" sortKey="Date Filed" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
             </span>
             {personField && (
               <span role="columnheader">
-                <SortableHeader label={personLabel} sortKey={personLabel} currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                <SortableHeader label="Filed By" sortKey={personLabel} currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
               </span>
             )}
             <span role="columnheader">
@@ -531,8 +537,8 @@ export default function DataPanel({
             <span role="columnheader">
               <SortableHeader label="Status" sortKey="Status" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
             </span>
-            {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
-            {showRequestActionBy && <span role="columnheader">Accepted / Rejected Date</span>}
+            <span role="columnheader">Endorsed By</span>
+            <span role="columnheader">Approved By</span>
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
 
@@ -542,8 +548,9 @@ export default function DataPanel({
             return (
               <div
                 key={item.id}
-                className={`employee-attendance-history-row ${showRequestActionBy ? "employee-attendance-history-row-actor" : ""} ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+                className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
                 role="row"
+                style={requestGridStyle}
               >
                 <span role="cell">{formatDateTime(item.date_filed)}</span>
                 {personField && (
@@ -584,17 +591,12 @@ export default function DataPanel({
                     )}
                   </div>
                 </span>
-                {showRequestActionBy && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, 'request_action_by_name')}</span>
-                    {item?.request_action_by_role ? <small>{item.request_action_by_role}</small> : null}
-                  </span>
-                )}
-                {showRequestActionBy && (
-                  <span role="cell">
-                    {formatDateTime(item.request_action_at)}
-                  </span>
-                )}
+                <span role="cell">
+                  {item.endorsed_by_name || "—"}
+                </span>
+                <span role="cell">
+                  {item.approved_by_name || "—"}
+                </span>
                 {onRequestAction && (
                   <span role="cell" className="employee-request-actions-cell">
                     <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>

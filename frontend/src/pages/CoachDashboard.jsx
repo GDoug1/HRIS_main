@@ -1579,8 +1579,10 @@ export default function CoachDashboard() {
         ) : isAttendanceView && canViewAttendance ? (
           <section className="content">
             {isFilingCenterView ? (
-              <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
-            ) : (
+              <FilingCenterPanel
+                initialTab={filingCenterInitialTab}
+                onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))}
+              />            ) : (
               <div className="employee-card employee-attendance-history-card">
                 <div className="employee-card-header">
                   <div>
