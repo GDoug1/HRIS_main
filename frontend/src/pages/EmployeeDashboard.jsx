@@ -3,7 +3,7 @@ import "../styles/EmployeeDashboard.css";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
-import DashboardSidebar from "../components/DashboardSidebar";
+import DashboardSidebar from "../components/ResponsiveDashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import ControlPanelSection from "../components/ControlPanelSection";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";

@@ -2,7 +2,7 @@ import "../styles/DashboardLayout.css";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import { parseSqlDateTime, saveDashboardAttendance } from "../api/attendance";
-import DashboardSidebar from "../components/DashboardSidebar";
+import DashboardSidebar from "../components/ResponsiveDashboardSidebar";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import AttendanceModule from "../components/AttendanceModule";
 import MainDashboard from "./MainDashboard";

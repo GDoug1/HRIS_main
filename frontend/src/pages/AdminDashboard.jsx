@@ -1,7 +1,7 @@
 import "../styles/DashboardLayout.css";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
-import DashboardSidebar from "../components/DashboardSidebar";
+import DashboardSidebar from "../components/ResponsiveDashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
