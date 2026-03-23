@@ -175,6 +175,15 @@ $items = [];
 
 $loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $employeeDetailsJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, $excludeRequesterCondition, $requestEmployeeReference, $sessionUserId, $currentEmployeeId, &$items) {
     $photoSelect = resolvePhotoSelect($conn, $table);
+    $tableColumns = getColumns($conn, $table);
+    $hasReviewedBy = in_array('reviewed_by', $tableColumns, true);
+    $hasApprovedBy = in_array('approved_by', $tableColumns, true);
+
+    $reviewedByExpr = $hasReviewedBy ? 'req.reviewed_by' : 'NULL';
+    $approvedByExpr = $hasApprovedBy ? 'req.approved_by' : 'NULL';
+
+    $userDisplayColumnName = $userDisplayColumn ?? 'email';
+    $userSecondaryColumnName = $userSecondaryColumn ?? 'email';
 
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
@@ -188,7 +197,9 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 $employeeNameExpr AS employee_name,
                 $employeeSecondaryExpr AS employee_username,
                 c.$clusterIdColumn AS cluster_id,
-                c.name AS cluster_name
+                c.name AS cluster_name,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), ''), eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), ''), ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
             FROM $table req
             $employeeJoinSql
             $employeeDetailsJoinSql
@@ -196,6 +207,10 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             LEFT JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
                 AND c.status = 'active'
             $userJoinSql
+            LEFT JOIN users eb_u ON eb_u.$usersIdColumn = $reviewedByExpr
+            LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumn
+            LEFT JOIN users ab_u ON ab_u.$usersIdColumn = $approvedByExpr
+            LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumn
             $extraJoinSql
             WHERE LOWER(COALESCE(req.status, '')) <> 'cancelled'
               AND $excludeRequesterCondition
@@ -222,7 +237,9 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             'employee_username' => trim((string)($row['employee_username'] ?? '')),
             'cluster_id' => isset($row['cluster_id']) ? (int)$row['cluster_id'] : null,
             'can_review' => ((int)$row['employee_id']) !== ($requestEmployeeReference === 'users' ? $sessionUserId : $currentEmployeeId),
-            'cluster_name' => $row['cluster_name'] ?: '—'
+            'cluster_name' => $row['cluster_name'] ?: '—',
+            'endorsed_by_name' => trim((string)($row['endorsed_by_name'] ?? '')),
+            'approved_by_name' => trim((string)($row['approved_by_name'] ?? ''))
         ];
     }
 };

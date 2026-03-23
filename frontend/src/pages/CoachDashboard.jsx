@@ -1696,7 +1696,11 @@ export default function CoachDashboard() {
                     <>
                       <div className="employee-card">
                         <div className="employee-card-body employee-card-body-flush">
-                          <AttendanceModule records={coachAttendanceHistory} onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
+                          <AttendanceModule records={coachAttendanceHistory} onDisputeClick={record => {
+                          setFilingCenterInitialTab("dispute");
+                          setFilingCenterInitialDate(record.date);
+                          setActiveNav("My Filing Center");
+                        }} />
                         </div>
                       </div>
                     </>

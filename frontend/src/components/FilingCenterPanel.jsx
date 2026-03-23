@@ -16,11 +16,11 @@ const getTomorrowDateInputValue = () => {
   return tomorrow.toISOString().slice(0, 10);
 };
 
-export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave" }) {
+export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave", initialDate = "" }) {
   const { confirm } = useFeedback();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [clusterInfo, setClusterInfo] = useState(null);
-  const [disputeType, setDisputeType] = useState("Time Correction");
+  const [disputeType, setDisputeType] = useState("Forget time in/out");
   const [leaveType, setLeaveType] = useState("Sick Leave");
   const [leaveStartDate, setLeaveStartDate] = useState("");
   const [leaveEndDate, setLeaveEndDate] = useState("");
@@ -28,7 +28,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const [overtimeDate, setOvertimeDate] = useState("");
   const [overtimeStart, setOvertimeStart] = useState("");
   const [overtimeEnd, setOvertimeEnd] = useState("");
-  const [disputeDate, setDisputeDate] = useState("");
+  const [disputeDate, setDisputeDate] = useState(initialDate);
   const [reason, setReason] = useState("");
   const [leavePhoto, setLeavePhoto] = useState(null);
   const [leavePhotoInputKey, setLeavePhotoInputKey] = useState(0);
@@ -40,7 +40,10 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
 
   useEffect(() => {
     setActiveTab(initialTab);
-  }, [initialTab]);
+    if (initialDate) {
+      setDisputeDate(initialDate);
+    }
+  }, [initialTab, initialDate]);
 
   useEffect(() => {
     // Fetch cluster info to show context
@@ -274,9 +277,12 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                 <div className="filing-field">
                   <label htmlFor="dispute-type">Dispute Type</label>
                   <select id="dispute-type" value={disputeType} onChange={event => setDisputeType(event.target.value)}>
-                    <option>Time Correction</option>
-                    <option>Status Discrepancy</option>
-                    <option>Missing Log</option>
+                    <option>Forget time in/out</option>
+                    <option>system error</option>
+                    <option>official business</option>
+                    <option>incorrect status</option>
+                    <option>breaktime</option>
+                    <option>lunch break</option>
                   </select>
                 </div>
               </div>

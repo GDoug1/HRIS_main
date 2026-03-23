@@ -125,6 +125,85 @@
   gap: 12px;
 }
 
+.am-filter-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.am-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.am-filter-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.am-filter-field input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  font-size: 13px;
+  color: #334155;
+  background: #fff;
+  transition: all 0.2s;
+  height: 36px;
+}
+
+.am-filter-field input[type="date"]:focus {
+  outline: none;
+  border-color: #1890ff;
+}
+
+.am-btn-secondary {
+  padding: 8px 16px;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  color: #64748b;
+  border-radius: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.am-btn-secondary:hover:not(:disabled) {
+  background: #f5f5f5;
+  color: #334155;
+}
+
+.am-sort-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.am-sort-btn:hover {
+  color: #1890ff;
+}
+
+.am-sort-btn.is-active {
+  color: #1890ff;
+  font-weight: 700;
+}
+
 .am-btn-outline {
   display: flex;
   align-items: center;

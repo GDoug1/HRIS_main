@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { CheckCircle2, XCircle, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
-import { formatDateTime } from "../utils/dateUtils";
+import { formatDateTime, formatFullDate } from "../utils/dateUtils";
 import { useFeedback } from "./FeedbackContext";
 
 const normalizeRequestDetails = value => {
@@ -43,14 +43,7 @@ const panelConfig = {
 };
 
 const formatAttendanceDate = value => {
-  if (!value) return "—";
-  const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleDateString([], {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
+  return formatFullDate(value);
 };
 
 const formatAttendanceTime = value => {
