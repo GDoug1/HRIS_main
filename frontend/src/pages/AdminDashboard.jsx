@@ -201,7 +201,7 @@ export default function AdminDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"];
+  const attendanceNavItems = useMemo(() => ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"], []);
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
@@ -260,7 +260,7 @@ export default function AdminDashboard() {
     if (canAccessControlPanel) {
       setActiveNav("Control Panel");
     }
-  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   const normalizeScheduleForm = coachSchedule => {
     const nextForm = createDefaultScheduleForm();

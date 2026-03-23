@@ -81,9 +81,8 @@ function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions
 }
 
 function LogDetailsModal({ log, onClose }) {
-  if (!log) return null;
-
   useEffect(() => {
+    if (!log) return;
     const handleKeyDown = event => {
       if (event.key === "Escape") {
         onClose();
@@ -92,7 +91,9 @@ function LogDetailsModal({ log, onClose }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [log, onClose]);
+
+  if (!log) return null;
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Log details" onClick={onClose}>

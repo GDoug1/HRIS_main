@@ -183,7 +183,7 @@ export default function CoachDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "File Request"];
+  const attendanceNavItems = useMemo(() => ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "File Request"], []);
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
@@ -244,7 +244,7 @@ export default function CoachDashboard() {
     if (canAccessControlPanel) {
       setActiveNav("Control Panel");
     }
-  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   useEffect(() => {
     if (window.location.pathname === "/coach/attendance") {

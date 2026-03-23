@@ -1,6 +1,6 @@
 import "../styles/DashboardLayout.css";
 import "../styles/EmployeeDashboard.css";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/DashboardSidebar";
@@ -39,7 +39,7 @@ export default function EmployeeDashboard() {
     ...(canAccessEmployeesTab ? ["Employees"] : []),
     ...(canAccessControlPanel ? ["Control Panel"] : [])
   ];
-  const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
+  const attendanceNavItems = useMemo(() => ["My Attendance", "My Requests", "My Filing Center"], []);
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
@@ -112,7 +112,7 @@ export default function EmployeeDashboard() {
     if (canAccessControlPanel) {
       setActiveNav("Control Panel");
     }
-  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
