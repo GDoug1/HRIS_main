@@ -56,7 +56,7 @@ const buildAllAttendanceHighlights = records => {
     { key: "totalHours", label: "Total Hours", icon: "◷", accentClass: "is-slate", value: totals.totalHours.toFixed(2), subValue: "Calculated from logs" },
     { key: "daysPresent", label: "Days Present", icon: "◉", accentClass: "is-green", value: totals.daysPresent.size, subValue: "Logged attendance days" },
     { key: "totalLate", label: "Total Late", icon: "!", accentClass: "is-amber", value: totals.totalLate, subValue: "Requires attention" },
-    { key: "overtime", label: "Overtime", icon: "↗", accentClass: "is-blue", value: totals.overtime.toFixed(2), subValue: "Tagged overtime logs" },
+    { key: "overtime", label: "Overtime", icon: "↗", accentClass: "is-blue", value: totals.overtime, subValue: "Tagged overtime logs" },
   ];
 };
 

@@ -260,9 +260,7 @@ if (hasTable($conn, 'leave_requests')) {
         'reason',
         "CONCAT(COALESCE(req.start_date, ''), CASE WHEN req.end_date IS NOT NULL THEN CONCAT(' to ', req.end_date) ELSE '' END)",
         'leave',
-        'Leave',
-        '',
-        " AND LOWER(COALESCE(req.status, 'pending')) = 'endorsed'"
+        'Leave'
     );
 }
 
@@ -274,9 +272,7 @@ if (hasTable($conn, 'overtime_requests')) {
         'purpose',
         "CONCAT(COALESCE(req.start_time, ''), CASE WHEN req.end_time IS NOT NULL THEN CONCAT(' to ', req.end_time) ELSE '' END)",
         'overtime',
-        'Overtime',
-        '',
-        " AND LOWER(COALESCE(req.status, 'pending')) = 'endorsed'"
+        'Overtime'
     );
 }
 
