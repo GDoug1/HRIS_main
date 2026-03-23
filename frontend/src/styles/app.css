@@ -2870,6 +2870,10 @@ body {
   cursor: pointer;
 }
 
+.filing-agreement + .filing-agreement {
+  margin-top: 14px;
+}
+
 .filing-agreement input {
   width: 18px;
   height: 18px;

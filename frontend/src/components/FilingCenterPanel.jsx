@@ -33,7 +33,8 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const [leavePhoto, setLeavePhoto] = useState(null);
   const [leavePhotoInputKey, setLeavePhotoInputKey] = useState(0);
   const [message, setMessage] = useState("");
-  const [agreement, setAgreement] = useState(false);
+  const [agreementAccuracy, setAgreementAccuracy] = useState(false);
+  const [agreementFraud, setAgreementFraud] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
 
@@ -75,11 +76,12 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
     setDisputeDate("");
     setLeavePhoto(null);
     setLeavePhotoInputKey(prev => prev + 1);
-    setAgreement(false);
+    setAgreementAccuracy(false);
+    setAgreementFraud(false);
   };
 
   const handleSubmit = async () => {
-    if (submitting || !agreement) return;
+    if (submitting || !agreementAccuracy || !agreementFraud) return;
     setMessage("");
 
     const hasConfirmedSubmission = await confirm({
@@ -286,14 +288,23 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
             </div>
 
             <div className="filing-agreement-container">
-              <label className="filing-agreement" htmlFor="agreement-check">
+              <label className="filing-agreement" htmlFor="agreement-accuracy">
                 <input
-                  id="agreement-check"
+                  id="agreement-accuracy"
                   type="checkbox"
-                  checked={agreement}
-                  onChange={event => setAgreement(event.target.checked)}
+                  checked={agreementAccuracy}
+                  onChange={event => setAgreementAccuracy(event.target.checked)}
                 />
-                <span>I certify that the information provided is true and correct to the best of my knowledge.</span>
+                <span>I confirm that the information submitted has undergone a thorough double-check process, ensuring its accuracy and reliability to the best of my knowledge and abilities</span>
+              </label>
+              <label className="filing-agreement" htmlFor="agreement-fraud" style={{ marginTop: "12px" }}>
+                <input
+                  id="agreement-fraud"
+                  type="checkbox"
+                  checked={agreementFraud}
+                  onChange={event => setAgreementFraud(event.target.checked)}
+                />
+                <span>I understand that falsifying information is a serious offense, constituting fraud, and I acknowledge that engaging in such behavior can lead to severe consequences, including termination of employment</span>
               </label>
             </div>
 
@@ -302,7 +313,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
               type="button"
               className="filing-submit-btn"
               onClick={handleSubmit}
-              disabled={submitting || !agreement}
+              disabled={submitting || !agreementAccuracy || !agreementFraud}
             >
               {submitting ? "Submitting..." : "Submit Request"}
             </button>
