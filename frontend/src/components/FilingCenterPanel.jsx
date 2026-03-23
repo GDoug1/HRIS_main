@@ -159,11 +159,15 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
       </div>
 
       <div className="filing-center-shell">
-        <nav className="filing-center-tabs" aria-label="Filing request types">
+        <nav className="filing-center-tabs" aria-label="Filing request types" role="tablist">
           {filingTabs.map(tab => (
             <button
               key={tab.key}
               type="button"
+              id={`tab-${tab.key}`}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              aria-controls={`panel-${tab.key}`}
               className={`filing-center-tab${activeTab === tab.key ? " is-active" : ""}`}
               onClick={() => setActiveTab(tab.key)}
             >
@@ -173,51 +177,58 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
           ))}
         </nav>
 
-        <section className="filing-center-panel">
+        <section
+          className="filing-center-panel"
+          id={`panel-${activeTab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${activeTab}`}
+        >
           <header className="filing-center-panel-header">{panelTitle}</header>
 
           <div className="filing-center-panel-body">
             {clusterInfo && (
-              <div className="filing-context-banner">
+              <div className="filing-context-banner" role="status">
                 Filing as member of <strong>{clusterInfo.cluster_name || "Unknown Cluster"}</strong> under Coach <strong>{clusterInfo.coach_name || "Unknown Coach"}</strong>
               </div>
             )}
             {activeTab === "leave" && (
               <>
-                <label className="filing-field filing-field-full">
-                  <span>Leave Type</span>
-                  <select value={leaveType} onChange={event => setLeaveType(event.target.value)}>
+                <div className="filing-field filing-field-full">
+                  <label htmlFor="leave-type">Leave Type</label>
+                  <select id="leave-type" value={leaveType} onChange={event => setLeaveType(event.target.value)}>
                     <option>Sick Leave</option>
                     <option>Vacation Leave</option>
                     <option>Emergency Leave</option>
                   </select>
-                </label>
+                </div>
 
                 <div className="filing-grid-two">
-                  <label className="filing-field">
-                    <span>Start Date</span>
-                    <input type="date" min={todayDate} value={leaveStartDate} onChange={event => setLeaveStartDate(event.target.value)} />
-                  </label>
-                  <label className="filing-field">
-                    <span>End Date</span>
-                    <input type="date" min={leaveStartDate || todayDate} value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
-                  </label>
+                  <div className="filing-field">
+                    <label htmlFor="leave-start">Start Date</label>
+                    <input id="leave-start" type="date" min={todayDate} value={leaveStartDate} onChange={event => setLeaveStartDate(event.target.value)} />
+                  </div>
+                  <div className="filing-field">
+                    <label htmlFor="leave-end">End Date</label>
+                    <input id="leave-end" type="date" min={leaveStartDate || todayDate} value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
+                  </div>
                 </div>
                 <div className="filing-grid-two">
-                  <label className="filing-field filing-field-full">
-                    <span>Upload Photo</span>
+                  <div className="filing-field filing-field-full">
+                    <label htmlFor="leave-photo">Upload Photo</label>
                     <input
+                      id="leave-photo"
                       key={leavePhotoInputKey}
                       type="file"
                       accept="image/*"
                       required
+                      aria-describedby="photo-help"
                       onChange={event => setLeavePhoto(event.target.files?.[0] ?? null)}
                     />
-                    <small className="filing-field-help">
+                    <small id="photo-help" className="filing-field-help">
                       Upload a supporting photo before you can submit a leave request.
                       {leavePhoto ? ` Selected: ${leavePhoto.name}` : ""}
                     </small>
-                  </label>
+                  </div>
                 </div>
               </>
             )}
@@ -227,56 +238,57 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                 <div className="filing-warning" role="alert">
                   Overtime requests must be filed for a future date. Same-day filing is not permitted to allow for prior approval by your supervisor.
                 </div>
-                <label className="filing-field filing-field-full">
-                  <span>Overtime Type</span>
-                  <select value={otType} onChange={event => setOtType(event.target.value)}>
+                <div className="filing-field filing-field-full">
+                  <label htmlFor="ot-type">Overtime Type</label>
+                  <select id="ot-type" value={otType} onChange={event => setOtType(event.target.value)}>
                     <option>Regular Overtime</option>
                     <option>Duty on Rest Day</option>
                     <option>Duty on Rest Day OT</option>
                   </select>
-                </label>
+                </div>
                 <div className="filing-grid-three">
-                  <label className="filing-field">
-                    <span>Date</span>
-                    <input type="date" min={tomorrowDate} value={overtimeDate} onChange={event => setOvertimeDate(event.target.value)} />
-                  </label>
-                  <label className="filing-field">
-                    <span>Start Time</span>
-                    <input type="time" value={overtimeStart} onChange={event => setOvertimeStart(event.target.value)} />
-                  </label>
-                  <label className="filing-field">
-                    <span>End Time</span>
-                    <input type="time" value={overtimeEnd} onChange={event => setOvertimeEnd(event.target.value)} />
-                  </label>
+                  <div className="filing-field">
+                    <label htmlFor="ot-date">Date</label>
+                    <input id="ot-date" type="date" min={tomorrowDate} value={overtimeDate} onChange={event => setOvertimeDate(event.target.value)} />
+                  </div>
+                  <div className="filing-field">
+                    <label htmlFor="ot-start">Start Time</label>
+                    <input id="ot-start" type="time" value={overtimeStart} onChange={event => setOvertimeStart(event.target.value)} />
+                  </div>
+                  <div className="filing-field">
+                    <label htmlFor="ot-end">End Time</label>
+                    <input id="ot-end" type="time" value={overtimeEnd} onChange={event => setOvertimeEnd(event.target.value)} />
+                  </div>
                 </div>
               </>
             )}
 
             {activeTab === "dispute" && (
               <div className="filing-grid-two">
-                <label className="filing-field">
-                  <span>Dispute Date</span>
-                  <input type="date" min={todayDate} value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
-                </label>
-                <label className="filing-field">
-                  <span>Dispute Type</span>
-                  <select value={disputeType} onChange={event => setDisputeType(event.target.value)}>
+                <div className="filing-field">
+                  <label htmlFor="dispute-date">Dispute Date</label>
+                  <input id="dispute-date" type="date" min={todayDate} value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
+                </div>
+                <div className="filing-field">
+                  <label htmlFor="dispute-type">Dispute Type</label>
+                  <select id="dispute-type" value={disputeType} onChange={event => setDisputeType(event.target.value)}>
                     <option>Time Correction</option>
                     <option>Status Discrepancy</option>
                     <option>Missing Log</option>
                   </select>
-                </label>
+                </div>
               </div>
             )}
 
-            <label className="filing-field filing-field-full">
-              <span>Reason / Justification</span>
-              <textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="Provide a detailed explanation for your request..." rows={4} />
-            </label>
+            <div className="filing-field filing-field-full">
+              <label htmlFor="filing-reason">Reason / Justification</label>
+              <textarea id="filing-reason" value={reason} onChange={event => setReason(event.target.value)} placeholder="Provide a detailed explanation for your request..." rows={4} />
+            </div>
 
             <div className="filing-agreement-container">
-              <label className="filing-agreement">
+              <label className="filing-agreement" htmlFor="agreement-check">
                 <input
+                  id="agreement-check"
                   type="checkbox"
                   checked={agreement}
                   onChange={event => setAgreement(event.target.checked)}

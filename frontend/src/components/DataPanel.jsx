@@ -248,28 +248,28 @@ export default function DataPanel({
     return (
       <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
         <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history">
-          <label className="attendance-history-filter">
-            <span>From</span>
-            <input type="date" value={dateStartFilter} onChange={event => setDateStartFilter(event.target.value)} />
-          </label>
-          <label className="attendance-history-filter">
-            <span>To</span>
-            <input type="date" value={dateEndFilter} onChange={event => setDateEndFilter(event.target.value)} />
-          </label>
+          <div className="attendance-history-filter">
+            <label htmlFor="att-from">From</label>
+            <input id="att-from" type="date" value={dateStartFilter} onChange={event => setDateStartFilter(event.target.value)} />
+          </div>
+          <div className="attendance-history-filter">
+            <label htmlFor="att-to">To</label>
+            <input id="att-to" type="date" value={dateEndFilter} onChange={event => setDateEndFilter(event.target.value)} />
+          </div>
           {typeof onExternalDateFilterChange === "function" && (
-            <label className="attendance-history-filter">
-              <span>Date</span>
-              <input type="date" value={externalDateFilter ?? ""} onChange={event => onExternalDateFilterChange(event.target.value)} />
-            </label>
+            <div className="attendance-history-filter">
+              <label htmlFor="att-ext-date">Date</label>
+              <input id="att-ext-date" type="date" value={externalDateFilter ?? ""} onChange={event => onExternalDateFilterChange(event.target.value)} />
+            </div>
           )}
-          <label className="attendance-history-filter" style={{ minWidth: "260px" }}>
-            <span>Search</span>
-            <input type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }} />
-          </label>
-          <label className="attendance-history-filter attendance-history-rows-filter">
-            <span>Rows per page</span>
-            <input type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </label>
+          <div className="attendance-history-filter" style={{ minWidth: "260px" }}>
+            <label htmlFor="att-search">Search</label>
+            <input id="att-search" type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }} />
+          </div>
+          <div className="attendance-history-filter attendance-history-rows-filter">
+            <label htmlFor="att-rows">Rows per page</label>
+            <input id="att-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
+          </div>
         </div>
 
         <div className="employee-attendance-history-scroll">
@@ -344,41 +344,42 @@ export default function DataPanel({
         <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
           {enableRequestFilters && (
             <>
-              <label className="attendance-history-filter">
-                <span>Request Type</span>
-                <select value={requestTypeFilter} onChange={event => { setRequestTypeFilter(event.target.value); setCurrentPage(1); }}>
+              <div className="attendance-history-filter">
+                <label htmlFor="req-type">Request Type</label>
+                <select id="req-type" value={requestTypeFilter} onChange={event => { setRequestTypeFilter(event.target.value); setCurrentPage(1); }}>
                   {requestTypeOptions.map(option => (
                     <option key={option} value={option}>
                       {option === "all" ? "All request types" : option}
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="attendance-history-filter">
-                <span>Status</span>
-                <select value={requestStatusFilter} onChange={event => { setRequestStatusFilter(event.target.value); setCurrentPage(1); }}>
+              </div>
+              <div className="attendance-history-filter">
+                <label htmlFor="req-status">Status</label>
+                <select id="req-status" value={requestStatusFilter} onChange={event => { setRequestStatusFilter(event.target.value); setCurrentPage(1); }}>
                   {requestStatusOptions.map(option => (
                     <option key={option} value={option}>
                       {option === "all" ? "All statuses" : option}
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
             </>
           )}
-          <label className="attendance-history-filter" style={{ minWidth: "280px" }}>
-            <span>Search</span>
+          <div className="attendance-history-filter" style={{ minWidth: "280px" }}>
+            <label htmlFor="req-search">Search</label>
             <input
+              id="req-search"
               type="text"
               value={searchQuery}
               placeholder={config.searchPlaceholder}
               onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
             />
-          </label>
-          <label className="attendance-history-filter attendance-history-rows-filter">
-            <span>Rows per page</span>
-            <input type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </label>
+          </div>
+          <div className="attendance-history-filter attendance-history-rows-filter">
+            <label htmlFor="req-rows">Rows per page</label>
+            <input id="req-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
+          </div>
         </div>
 
         <div className="employee-attendance-history-scroll">
@@ -476,15 +477,16 @@ export default function DataPanel({
                             className={`${action.variant ?? "btn"} action-icon-btn`}
                             type="button"
                             title={action.label}
+                            aria-label={action.label}
                             disabled={requestActionLoadingId === item.id || !isEnabled}
                             onClick={() => onRequestAction(item, action.status)}
                           >
                             {requestActionLoadingId === item.id ? (
                               "…"
                             ) : action.status === "Approved" ? (
-                              <CheckCircle2 size={18} />
+                              <CheckCircle2 size={18} aria-hidden="true" />
                             ) : (
-                              <XCircle size={18} />
+                              <XCircle size={18} aria-hidden="true" />
                             )}
                           </button>
                         );
@@ -530,7 +532,14 @@ export default function DataPanel({
                     {selectedRequest.request_type ?? "Request"} filed on {formatDateTimeLabel(selectedRequest.date_filed)}
                   </p>
                 </div>
-                <button className="icon-btn request-details-close-btn" type="button" aria-label="Close request details" onClick={() => setSelectedRequest(null)}>✕</button>
+                <button
+                  className="icon-btn request-details-close-btn"
+                  type="button"
+                  aria-label="Close request details"
+                  onClick={() => setSelectedRequest(null)}
+                >
+                  ✕
+                </button>
               </div>
               <div className="request-details-modal-body">
                 <div className="request-details-content">

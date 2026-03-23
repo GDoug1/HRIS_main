@@ -1344,8 +1344,8 @@ body {
 }
 
 .member-status-tag.is-active {
-  border-color: #E4EEFE;
-  color: #E4EEFE;
+  border-color: #357AF4;
+  color: #ffffff;
   background: #357AF4;
   font-weight: 600;
 }
@@ -1369,9 +1369,9 @@ body {
 }
 
 .status-not-available {
-  background: #777777;
-  color: #e7e7e7;
-  border: 1px solid #575757;
+  background: #64748b;
+  color: #ffffff;
+  border: 1px solid #475569;
 }
 
 
