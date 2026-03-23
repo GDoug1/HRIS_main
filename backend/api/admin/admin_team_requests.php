@@ -173,7 +173,7 @@ if ($usersIdColumn !== null) {
 
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $employeeDetailsJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, $excludeRequesterCondition, $requestEmployeeReference, $sessionUserId, $currentEmployeeId, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $employeeDetailsJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, $excludeRequesterCondition, $requestEmployeeReference, $sessionUserId, $currentEmployeeId, $usersIdColumn, $userDisplayColumn, $userSecondaryColumn, $employeeColumns, &$items) {
     $photoSelect = resolvePhotoSelect($conn, $table);
     $tableColumns = getColumns($conn, $table);
     $hasReviewedBy = in_array('reviewed_by', $tableColumns, true);
@@ -184,6 +184,14 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
 
     $userDisplayColumnName = $userDisplayColumn ?? 'email';
     $userSecondaryColumnName = $userSecondaryColumn ?? 'email';
+    $usersIdColumnName = $usersIdColumn ?? 'user_id';
+
+    $ebFullNameExpr = in_array('first_name', $employeeColumns, true) && in_array('last_name', $employeeColumns, true)
+        ? "NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), '')"
+        : "''";
+    $abFullNameExpr = in_array('first_name', $employeeColumns, true) && in_array('last_name', $employeeColumns, true)
+        ? "NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), '')"
+        : "''";
 
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
@@ -198,8 +206,8 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 $employeeSecondaryExpr AS employee_username,
                 c.$clusterIdColumn AS cluster_id,
                 c.name AS cluster_name,
-                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), ''), eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
-                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), ''), ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
+                COALESCE($ebFullNameExpr, eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
+                COALESCE($abFullNameExpr, ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
             FROM $table req
             $employeeJoinSql
             $employeeDetailsJoinSql
@@ -207,10 +215,10 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             LEFT JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
                 AND c.status = 'active'
             $userJoinSql
-            LEFT JOIN users eb_u ON eb_u.$usersIdColumn = $reviewedByExpr
-            LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumn
-            LEFT JOIN users ab_u ON ab_u.$usersIdColumn = $approvedByExpr
-            LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumn
+            LEFT JOIN users eb_u ON eb_u.$usersIdColumnName = $reviewedByExpr
+            LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumnName
+            LEFT JOIN users ab_u ON ab_u.$usersIdColumnName = $approvedByExpr
+            LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumnName
             $extraJoinSql
             WHERE LOWER(COALESCE(req.status, '')) <> 'cancelled'
               AND $excludeRequesterCondition
