@@ -2060,55 +2060,66 @@ body {
 .attendance-history-highlights {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .attendance-history-highlight-card {
-  border: 1px solid #d9dee8;
-  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-  padding: 18px 20px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  padding: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.attendance-history-highlight-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
 .attendance-history-highlight-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #0f172a;
-  font-size: 18px;
-  margin-bottom: 18px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
 }
 
 .attendance-history-highlight-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   color: #ffffff;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 16px;
 }
 
-.attendance-history-highlight-icon.is-slate { background: #64748b; }
-.attendance-history-highlight-icon.is-green { background: #52c41a; }
-.attendance-history-highlight-icon.is-amber { background: #f59e0b; }
-.attendance-history-highlight-icon.is-blue { background: #1890ff; }
-.attendance-history-highlight-icon.is-red { background: #f5222d; }
+.attendance-history-highlight-icon.is-slate { background: #475569; }
+.attendance-history-highlight-icon.is-green { background: #16a34a; }
+.attendance-history-highlight-icon.is-amber { background: #d97706; }
+.attendance-history-highlight-icon.is-blue { background: #2563eb; }
+.attendance-history-highlight-icon.is-red { background: #dc2626; }
 
 .attendance-history-highlight-value {
-  color: #cbd5e1;
-  font-size: 16px;
+  color: #0f172a;
+  font-size: 28px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .attendance-history-highlight-subvalue {
-  margin-top: 10px;
+  margin-top: 6px;
   color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .attendance-summary-grid {
