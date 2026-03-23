@@ -407,6 +407,28 @@ body {
   color: var(--text-inverse);
 }
 
+.btn.is-primary {
+  background: var(--primary);
+  color: var(--text-inverse);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.24);
+}
+
+.btn.is-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn.is-danger {
+  background: var(--danger);
+  color: var(--text-inverse);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.24);
+}
+
+.btn.is-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+  transform: translateY(-1px);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

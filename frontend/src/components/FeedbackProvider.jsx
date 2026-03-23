@@ -106,22 +106,25 @@ export function FeedbackProvider({ children }) {
       </div>
 
       {dialogState ? (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={dialogState.title} onClick={() => closeDialog(false)}>
-          <div className="modal-card confirm-modal-card" onClick={event => event.stopPropagation()}>
-            <div>
-              <h3 className="confirm-modal-title">{dialogState.title}</h3>
+        <div className="modal-overlay" role="presentation" onClick={() => closeDialog(false)}>
+          <div className="modal-card confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title" onClick={event => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3 id="confirm-title" className="confirm-modal-title">{dialogState.title}</h3>
+            </div>
+            
+            <div className="modal-body">
               <p className="confirm-modal-message feedback-dialog-message">{dialogState.message}</p>
             </div>
 
             <div className="confirm-modal-actions">
               {dialogState.kind === "confirm" ? (
-                <button className="btn confirm-cancel-btn" type="button" onClick={() => closeDialog(false)}>
+                <button className="btn secondary" type="button" onClick={() => closeDialog(false)}>
                   {dialogState.cancelLabel}
                 </button>
               ) : null}
 
               <button
-                className={`confirm-modal-btn is-${dialogState.variant}`}
+                className={`btn is-${dialogState.variant}`}
                 type="button"
                 onClick={() => closeDialog(true)}
               >
