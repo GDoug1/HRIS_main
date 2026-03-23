@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
+import { formatFullDate, formatDateTime } from "../utils/dateUtils";
+import { useFeedback } from "./FeedbackProvider";
 
 const normalizeRequestDetails = value => {
   const text = String(value ?? "").trim();
@@ -38,33 +40,6 @@ const panelConfig = {
     messageTitle: "Unable to load requests",
     messageSubtitle: "Please try again in a few moments."
   }
-};
-
-const formatDateTimeLabel = value => {
-  if (!value) return "—";
-  const date = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-};
-
-
-const formatRequestActionDate = value => {
-  if (!value) return "—";
-  const date = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
 };
 
 const formatAttendanceDate = value => {
@@ -134,6 +109,7 @@ export default function DataPanel({
   enableRequestFilters = false,
   showRequestActionBy = false,
 }) {
+  const { confirm } = useFeedback();
   const config = panelConfig[type] ?? panelConfig.attendance;
   const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
     ? requestActions
@@ -149,6 +125,27 @@ export default function DataPanel({
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rowsPerPageInput, setRowsPerPageInput] = useState("10");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const handleActionClick = async (item, action) => {
+    if (!onRequestAction) return;
+
+    const isDenial =
+      action.status.toLowerCase().includes("reject") ||
+      action.status.toLowerCase().includes("denied") ||
+      action.status.toLowerCase().includes("decline");
+
+    if (isDenial) {
+      const ok = await confirm({
+        title: `Confirm ${action.label}`,
+        message: `Are you sure you want to ${action.label.toLowerCase()} this request?`,
+        confirmLabel: action.label,
+        variant: "danger",
+      });
+      if (!ok) return;
+    }
+
+    onRequestAction(item, action.status);
+  };
 
   const requestTypeOptions = useMemo(() => ([
     "all",
@@ -310,7 +307,14 @@ export default function DataPanel({
                 )}
                 {onEditRow && (
                   <span role="cell">
-                    <button className="btn" type="button" onClick={() => onEditRow(item)}>Edit</button>
+                    <button
+                      className="btn"
+                      type="button"
+                      aria-label={`Edit attendance for ${formatAttendanceDate(attendanceDateValue)}`}
+                      onClick={() => onEditRow(item)}
+                    >
+                      Edit
+                    </button>
                   </span>
                 )}
               </div>
@@ -407,7 +411,7 @@ export default function DataPanel({
                 className={`employee-attendance-history-row ${showRequestActionBy ? "employee-attendance-history-row-actor" : ""} ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
                 role="row"
               >
-                <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
+                <span role="cell">{formatDateTime(item.date_filed)}</span>
                 {personField && (
                   <span role="cell" className="team-attendance-employee-cell">
                     <span>{getPersonPrimaryValue(item, personField)}</span>
@@ -421,6 +425,7 @@ export default function DataPanel({
                     <button
                       className="btn secondary"
                       type="button"
+                      aria-label={`View details for ${item.request_type || "request"} filed on ${formatDateTime(item.date_filed)}`}
                       onClick={() => setSelectedRequest(item)}
                     >
                       View
@@ -435,6 +440,7 @@ export default function DataPanel({
                       <button
                         className="btn secondary employee-request-photo-btn"
                         type="button"
+                        aria-label={`View supporting photo for ${item.request_type || "request"}`}
                         onClick={() => setSelectedRequest(item)}
                       >
                         View Photo
@@ -452,7 +458,7 @@ export default function DataPanel({
                 )}
                 {showRequestActionBy && (
                   <span role="cell">
-                    {formatRequestActionDate(item.request_action_at)}
+                    {formatDateTime(item.request_action_at)}
                   </span>
                 )}
                 {onRequestAction && (
@@ -471,19 +477,22 @@ export default function DataPanel({
                           return null;
                         }
 
+                        const personName = getPersonPrimaryValue(item, personField);
+                        const descriptiveLabel = `${action.label} request by ${personName !== "—" ? personName : "this employee"}`;
+
                         return (
                           <button
                             key={`${item.id}-${action.status}`}
                             className={`${action.variant ?? "btn"} action-icon-btn`}
                             type="button"
                             title={action.label}
-                            aria-label={action.label}
+                            aria-label={descriptiveLabel}
                             disabled={requestActionLoadingId === item.id || !isEnabled}
-                            onClick={() => onRequestAction(item, action.status)}
+                            onClick={() => handleActionClick(item, action)}
                           >
                             {requestActionLoadingId === item.id ? (
                               "…"
-                            ) : action.status === "Approved" ? (
+                            ) : (action.status === "Approved" || action.status === "Endorsed") ? (
                               <CheckCircle2 size={18} aria-hidden="true" />
                             ) : (
                               <XCircle size={18} aria-hidden="true" />
@@ -529,7 +538,7 @@ export default function DataPanel({
                 <div className="request-details-modal-heading">
                   <div id="request-details-modal-title" className="modal-title request-details-modal-title">Request Details</div>
                   <p className="modal-text request-details-modal-subtitle">
-                    {selectedRequest.request_type ?? "Request"} filed on {formatDateTimeLabel(selectedRequest.date_filed)}
+                    {selectedRequest.request_type ?? "Request"} filed on {formatDateTime(selectedRequest.date_filed)}
                   </p>
                 </div>
                 <button
