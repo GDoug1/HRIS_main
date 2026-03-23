@@ -277,12 +277,12 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                 <div className="filing-field">
                   <label htmlFor="dispute-type">Dispute Type</label>
                   <select id="dispute-type" value={disputeType} onChange={event => setDisputeType(event.target.value)}>
-                    <option>Forget time in/out</option>
-                    <option>system error</option>
-                    <option>official business</option>
-                    <option>incorrect status</option>
-                    <option>breaktime</option>
-                    <option>lunch break</option>
+                    <option>Forget Time In/Out</option>
+                    <option>System Error</option>
+                    <option>Official Business</option>
+                    <option>Incorrect Status</option>
+                    <option>Break Time</option>
+                    <option>Lunch Break</option>
                   </select>
                 </div>
               </div>
