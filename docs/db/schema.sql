@@ -559,9 +559,8 @@ ALTER TABLE `users`
 --
 ALTER TABLE `user_permissions`
   ADD PRIMARY KEY (`Id`),
-  ADD KEY `user_id` (`user_id`),
-  ADD KEY `permission_id` (`permission_id`),
-  ADD UNIQUE KEY `uniq_user_permission` (`user_id`, `permission_id`);
+  ADD UNIQUE KEY `user_id` (`user_id`),
+  ADD UNIQUE KEY `permission_id` (`permission_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
