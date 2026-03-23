@@ -66,6 +66,9 @@
 
   .main {
     height: auto;
+    min-height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
   }
 
   .topbar {

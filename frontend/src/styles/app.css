@@ -23,6 +23,7 @@ body {
   background: var(--bg-gradient);
   margin: 0;
   color: var(--text-primary);
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -135,7 +136,11 @@ body {
 
   .main {
     padding: 84px 16px 16px;
+    min-height: calc(100vh - 84px);
+    height: auto;
+    overflow-y: visible;
     overflow: visible;
+    -webkit-overflow-scrolling: touch;
   }
 
   .topbar {
@@ -292,6 +297,7 @@ body {
 @media (max-width: 600px) {
   .main {
     padding: 78px 12px 12px;
+    min-height: calc(100vh - 78px);
   }
 }
 

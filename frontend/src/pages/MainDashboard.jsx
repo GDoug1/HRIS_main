@@ -5,7 +5,6 @@ import "../styles/MainDashboard.css";
 function DashboardHeader({ dateTimeLabel }) {
   return (
     <section className="dashboard-header">
-      <div className="dashboard-header-spacer" aria-hidden="true" />
       <div className="datetime">{dateTimeLabel}</div>
     </section>
   );
