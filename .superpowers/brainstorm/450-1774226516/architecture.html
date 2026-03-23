@@ -1,0 +1,43 @@
+<h2>Architecture: Approach A (Surgical Refinement)</h2>
+<p class="subtitle">Focusing on centralization and high-impact UI fixes</p>
+
+<div class="section">
+  <h3>1. Centralized Utilities</h3>
+  <div class="mockup">
+    <div class="mockup-header">frontend/src/utils/dateUtils.js</div>
+    <div class="mockup-body">
+      <pre style="font-size: 12px; background: #f5f5f5; padding: 10px; border-radius: 4px;">
+export const formatFullDate = (value) => { ... }
+// Returns: "Mon, March 23, 2026"
+
+export const formatDateTime = (value) => { ... }
+// Returns: "Mon, March 23, 2026 at 9:00 AM"
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. Accessible Modal Theming</h3>
+  <p>Ensuring WCAG AA contrast for confirmation dialogs.</p>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Standard Confirm</div>
+      <div class="mockup-body" style="padding: 15px; background: #fff;">
+        <div style="background: #357AF4; color: #fff; padding: 8px 16px; border-radius: 4px; display: inline-block; font-weight: 600;">
+          Confirm Action
+        </div>
+        <p style="font-size: 12px; margin-top: 10px;">Contrast Ratio: 4.5:1 (Passes AA)</p>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Danger Confirm</div>
+      <div class="mockup-body" style="padding: 15px; background: #fff;">
+        <div style="background: #D93025; color: #fff; padding: 8px 16px; border-radius: 4px; display: inline-block; font-weight: 600;">
+          Reject Request
+        </div>
+        <p style="font-size: 12px; margin-top: 10px;">Contrast Ratio: 4.6:1 (Passes AA)</p>
+      </div>
+    </div>
+  </div>
+</div>

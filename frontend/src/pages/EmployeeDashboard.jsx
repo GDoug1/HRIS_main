@@ -12,7 +12,6 @@ import DataPanel from "../components/DataPanel";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
 import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
-import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";

@@ -17,8 +17,8 @@ import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, update
 import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
-import { useFeedback } from "../components/FeedbackProvider";
-import { formatFullDate, formatDateTime } from "../utils/dateUtils";
+import { useFeedback } from "../components/FeedbackContext";
+import { formatFullDate } from "../utils/dateUtils";
 
 const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
 
@@ -477,40 +477,6 @@ export default function AdminDashboard() {
       return savedAttendance;
     } finally {
       setIsSavingAttendance(false);
-    }
-  };
-
-  const handleTimeIn = async () => {
-    if (isSavingAttendance || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
-
-    const now = new Date();
-    const scheduledStartMinutes = 9 * 60;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const tag = nowMinutes <= scheduledStartMinutes + 15 ? "On Time" : "Late";
-
-    await persistAttendance({
-      timeInAt: now,
-      timeOutAt: null,
-      tag
-    });
-
-    if (activeNav === "Attendance") {
-      const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
-      setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
-    }
-  };
-
-  const handleTimeOut = async () => {
-    if (isSavingAttendance || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
-
-    await persistAttendance({
-      ...attendanceLog,
-      timeOutAt: new Date()
-    });
-
-    if (activeNav === "Attendance") {
-      const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
-      setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
     }
   };
 

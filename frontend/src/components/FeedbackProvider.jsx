@@ -1,6 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-
-const FeedbackContext = createContext(null);
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FeedbackContext } from "./FeedbackContext";
 
 export function FeedbackProvider({ children }) {
   const [toasts, setToasts] = useState([]);
@@ -134,13 +133,4 @@ export function FeedbackProvider({ children }) {
       ) : null}
     </FeedbackContext.Provider>
   );
-}
-
-export function useFeedback() {
-  const context = useContext(FeedbackContext);
-  if (!context) {
-    throw new Error("useFeedback must be used within a FeedbackProvider.");
-  }
-
-  return context;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
-import { useFeedback } from "./FeedbackProvider";
+import { useFeedback } from "./FeedbackContext";
 
 const RESTRICTED_PERMISSIONS_BY_ROLE = {
   employee: new Set([

@@ -17,7 +17,7 @@ import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
-import { useFeedback } from "../components/FeedbackProvider";
+import { useFeedback } from "../components/FeedbackContext";
 import { formatFullDate, formatDateTime } from "../utils/dateUtils";
 
 const attendanceSortOptions = {
