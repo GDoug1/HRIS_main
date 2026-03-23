@@ -71,7 +71,37 @@ This document provides step-by-step instructions for performing Quality Assuranc
 
 ---
 
-## 🚩 4. Bug Reporting Protocol
+## 🧪 4. New Features: Accessibility & UI Remediation Verification
+*Objective: Verify specific remediations for standardized formatting and accessibility.*
+
+### 1. Centralized Date Formatting
+*   **Target:** `DataPanel`, `CoachDashboard`, `AdminDashboard`.
+*   **Execution:** View any list of requests or attendance logs.
+*   **Verification:** Ensure the format strictly follows: **"Mon, March 23, 2026"** (Short Day, Full Month, Numeric Day, Full Year).
+*   **Success Criteria:** No numeric-only dates (e.g., 03/23/2026) or short month abbreviations (e.g., Mar) should appear in core lists.
+
+### 2. High-Contrast Modal Variants
+*   **Execution (Primary):** Click "Time Out" or "Approve".
+*   **Verification:** Confirm the confirmation button is **Dark Blue (#357AF4)** with white text.
+*   **Execution (Danger):** Click "Reject" or "Cancel Request".
+*   **Verification:** Confirm the confirmation button is **Dark Red (#D93025)** with white text.
+*   **Success Criteria:** Text must be clearly readable. Buttons must have a visible border and hover effect.
+
+### 3. Screen Reader & Icon Refinement
+*   **Execution:** Use "Inspect Element" (F12) or a screen reader (NVDA/VoiceOver) on the Approve/Reject icons in `DataPanel`.
+*   **Verification:**
+    *   Check that the `<button>` has a descriptive `aria-label` (e.g., `"Approve for Jaden Rivera"`).
+    *   Check that the nested `<svg>` icon has `aria-hidden="true"`.
+*   **Success Criteria:** Screen readers should announce the action and context, not just "button".
+
+### 4. Mandatory Action Confirmation
+*   **Execution:** Attempt to "Time Out" from the Dashboard or "Reject" a request from the table.
+*   **Verification:** A confirmation modal MUST appear before the action is executed.
+*   **Success Criteria:** It should be impossible to perform these actions with a single accidental click.
+
+---
+
+## 🚩 5. Bug Reporting Protocol
 
 If a test case fails (Status: **Need Revisions**):
 1.  **Capture Console Logs:** Press **F12**, go to **Console**, and take a screenshot of any red errors.
@@ -79,4 +109,4 @@ If a test case fails (Status: **Need Revisions**):
 3.  **Update Matrix:** Update the `STATUS` column in `docs/qa/ATTENDANCE_TEST_CASES.md`.
 
 ---
-*Created: March 23, 2026*
+*Updated: March 23, 2026*
