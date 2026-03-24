@@ -4,6 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "../api/api";
 import AuthLayout from "../components/AuthLayout";
 import { useNavigate } from "react-router-dom";
+import { getHomeRouteForRole } from "../utils/roleRoutes";
 
 import bg from "../assets/login_bg.svg";
 import logo from "../assets/ireply.png";
@@ -26,8 +27,6 @@ export default function Login() {
         body: JSON.stringify({ email, password })
       });
 
-      const normalizedRole = String(data.role || "").toLowerCase();
-
       if (data.fullname) {
         localStorage.setItem(
           "teamClusterUser",
@@ -38,15 +37,7 @@ export default function Login() {
         );
       }
 
-      const redirectPath =
-        data.redirect ||
-        (normalizedRole.includes("super admin")
-          ? "/super-admin"
-          : normalizedRole.includes("admin")
-          ? "/admin"
-          : normalizedRole.includes("coach")
-          ? "/coach"
-          : "/employee");
+      const redirectPath = getHomeRouteForRole(data.role);
 
       navigate(redirectPath);
     } catch (err) {
