@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Search, ChevronUp, ChevronDown, ArrowUpDown, Loader2 } from 'lucide-react';
 import './UnifiedTable.css';
 
@@ -20,6 +20,7 @@ const SortableHeader = ({ label, sortKey, currentSortKey, direction, onSort }) =
 };
 
 export default function UnifiedTable({
+  title, // Optional header title
   columns = [], // { label, key, sortKey, sortable, expandable }
   data = [],
   loading = false,
@@ -55,6 +56,7 @@ export default function UnifiedTable({
   return (
     <div className="am-content-panel">
       <div className="am-toolbar">
+        {title && <h2 className="am-toolbar-title">{title}</h2>}
         <div className="am-toolbar-actions">
           <div className="am-filter-group">
             <label className="am-filter-field">
