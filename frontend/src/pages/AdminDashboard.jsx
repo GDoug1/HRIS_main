@@ -1065,8 +1065,8 @@ const handleOpenRejectModal = cluster => {
                         <span className={`badge ${cluster.status}`}>{cluster.status}</span>
                       </div>
                       <div className="table-cell">
-                        <button className="btn primary" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
-                          Manage Team Coach Schedule
+                        <button className="btn primary team-coach-manage-btn" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
+                          Manage Schedule (Team Coach)
                         </button>
                       </div>
                     </div>

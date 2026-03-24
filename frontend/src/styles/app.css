@@ -391,6 +391,14 @@ body {
   background: var(--primary-hover);
 }
 
+.team-coach-manage-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
 .btn.secondary {
   background: var(--bg-card);
   border-color: var(--border-light);
