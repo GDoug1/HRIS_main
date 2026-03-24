@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
 import { normalizeAttendanceHistoryRecords } from '../api/attendance';

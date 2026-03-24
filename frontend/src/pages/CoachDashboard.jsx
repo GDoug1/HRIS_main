@@ -122,28 +122,23 @@ export default function CoachDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [formValues, setFormValues] = useState({ name: "", description: "" });
   const [editingClusterId, setEditingClusterId] = useState(null);
-  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReuploading, setIsReuploading] = useState(false);
   const [activeCluster, setActiveCluster] = useState(null);
   const [members, setMembers] = useState([]);
-  const [memberError, setMemberError] = useState("");
   const [memberLoading, setMemberLoading] = useState(false);
   const [availableEmployees, setAvailableEmployees] = useState([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);
-  const [employeeError, setEmployeeError] = useState("");
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [scheduleMember, setScheduleMember] = useState(null);
-  const [scheduleError, setScheduleError] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [isDeletingMember, setIsDeletingMember] = useState(false);
   const [isDisbanding, setIsDisbanding] = useState(false);
   const [activeMembers, setActiveMembers] = useState([]);
   const [activeMembersLoading, setActiveMembersLoading] = useState(false);
-  const [activeMembersError, setActiveMembersError] = useState("");
   const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [coachAttendanceHistory, setCoachAttendanceHistory] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
@@ -156,11 +151,9 @@ export default function CoachDashboard() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedAttendanceEntry, setSelectedAttendanceEntry] = useState(null);
   const [attendanceEditForm, setAttendanceEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
-  const [attendanceSaveError, setAttendanceSaveError] = useState("");
   const [isSavingAttendanceEdit, setIsSavingAttendanceEdit] = useState(false);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [teamRequests, setTeamRequests] = useState([]);
-  const [teamRequestsError, setTeamRequestsError] = useState("");
   const [requestActionLoadingId, setRequestActionLoadingId] = useState("");
   const [scheduleForm, setScheduleForm] = useState({
     days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
@@ -621,15 +614,14 @@ export default function CoachDashboard() {
     apiFetch("api/coach/coach_clusters.php")
       .then(setClusters)
       .catch(err => {
-        setError(err?.error ?? "Unable to load team clusters.");
+        showToast({ title: "Load Failed", message: err?.error ?? "Unable to load team clusters.", type: "error" });
       });
-  }, [canViewTeam]);
+  }, [canViewTeam, showToast]);
 
   useEffect(() => {
     if (!canViewTeam) {
       setActiveMembers([]);
       setAttendanceRows([]);
-      setActiveMembersError("");
       setActiveMembersLoading(false);
       return;
     }
@@ -638,13 +630,11 @@ export default function CoachDashboard() {
     if (!active) {
       setActiveMembers([]);
       setAttendanceRows([]);
-      setActiveMembersError("");
       setActiveMembersLoading(false);
       return;
     }
 
     setActiveMembersLoading(true);
-    setActiveMembersError("");
 
     apiFetch(`api/coach/manage_members.php?cluster_id=${active.id}&attendance_date=${attendanceDateFilter}`)
       .then(memberData => {
@@ -656,19 +646,17 @@ export default function CoachDashboard() {
         setAttendanceRows(normalizedMembers);
       })
       .catch(err => {
-        setActiveMembersError(err?.error ?? "Unable to load active team members.");
+        showToast({ title: "Load Failed", message: err?.error ?? "Unable to load active team members.", type: "error" });
       })
       .finally(() => {
         setActiveMembersLoading(false);
       });
-  }, [attendanceDateFilter, canViewTeam, clusters]);
+  }, [attendanceDateFilter, canViewTeam, clusters, showToast]);
 
   useEffect(() => {
     if (!canViewTeam || !activeCluster) return;
     setMemberLoading(true);
     setEmployeeLoading(true);
-    setMemberError("");
-    setEmployeeError("");
     setShowMemberForm(false);
     setSelectedEmployees([]);
     setEmployeeSearchQuery("");
@@ -689,15 +677,13 @@ export default function CoachDashboard() {
         );
       })
       .catch(err => {
-        const message = err?.error ?? "Unable to load team members.";
-        setMemberError(message);
-        setEmployeeError(message);
+        showToast({ title: "Load Failed", message: err?.error ?? "Unable to load team members.", type: "error" });
       })
       .finally(() => {
         setMemberLoading(false);
         setEmployeeLoading(false);
       });
-  }, [activeCluster, canViewTeam]);
+  }, [activeCluster, canViewTeam, showToast]);
 
   useEffect(() => {
     if (!canViewAttendance) {
@@ -828,11 +814,10 @@ export default function CoachDashboard() {
     event.preventDefault();
     if (isSubmitting) return;
     if (clusters.length > 0) {
-      setError("Only one team cluster is allowed per team coach.");
+      showToast({ title: "Action Denied", message: "Only one team cluster is allowed per team coach.", type: "error" });
       return;
     }
     setIsSubmitting(true);
-    setError("");
 
     try {
       const payload = {
@@ -848,8 +833,9 @@ export default function CoachDashboard() {
       setClusters(prev => [created, ...prev]);
       setFormValues({ name: "", description: "" });
       setShowForm(false);
+      showToast({ title: "Cluster Created", message: `Cluster "${created.name}" created successfully.`, type: "success" });
     } catch (err) {
-      setError(err?.error ?? "Unable to create cluster.");
+      showToast({ title: "Creation Failed", message: err?.error ?? "Unable to create cluster.", type: "error" });
     } finally {
       setIsSubmitting(false);
     }
@@ -859,7 +845,6 @@ export default function CoachDashboard() {
     setShowForm(false);
     setEditingClusterId(null);
     setFormValues({ name: "", description: "" });
-    setError("");
   };
 
   const handleManageClick = cluster => {
@@ -875,7 +860,6 @@ export default function CoachDashboard() {
       name: cluster.name ?? "",
       description: cluster.description ?? ""
     });
-    setError("");
   };
 
   const handleReuploadCluster = async cluster => {
@@ -885,12 +869,11 @@ export default function CoachDashboard() {
     const trimmedDescription = formValues.description.trim();
 
     if (!trimmedName) {
-      setError("Cluster name is required.");
+      showToast({ title: "Input Required", message: "Cluster name is required.", type: "error" });
       return;
     }
 
     setIsReuploading(true);
-    setError("");
 
     try {
       await apiFetch("api/coach/resubmit_cluster.php", {
@@ -917,8 +900,9 @@ export default function CoachDashboard() {
       setEditingClusterId(null);
       setShowForm(false);
       setFormValues({ name: "", description: "" });
+      showToast({ title: "Cluster Resubmitted", message: "Cluster has been re-uploaded for review.", type: "success" });
     } catch (err) {
-      setError(err?.error ?? "Unable to re-upload cluster for review.");
+      showToast({ title: "Resubmission Failed", message: err?.error ?? "Unable to re-upload cluster for review.", type: "error" });
     } finally {
       setIsReuploading(false);
     }
@@ -935,7 +919,6 @@ export default function CoachDashboard() {
     if (!hasConfirmed) return;
 
     setIsDisbanding(true);
-    setError("");
 
     try {
       await apiFetch("api/coach/disband_cluster.php", {
@@ -953,7 +936,7 @@ export default function CoachDashboard() {
       }
       setShowForm(false);
     } catch (err) {
-      setError(err?.error ?? "Unable to disband cluster.");
+      showToast({ title: "Action Failed", message: err?.error ?? "Unable to disband cluster.", type: "error" });
     } finally {
       setIsDisbanding(false);
     }
@@ -963,10 +946,7 @@ export default function CoachDashboard() {
     setActiveCluster(null);
     setMembers([]);
     setAvailableEmployees([]);
-    setMemberError("");
-    setEmployeeError("");
     setScheduleMember(null);
-    setScheduleError("");
     setShowMemberForm(false);
     setSelectedEmployees([]);
     setEmployeeSearchQuery("");
@@ -975,13 +955,11 @@ export default function CoachDashboard() {
   const handleOpenSchedule = member => {
     const normalizedSchedule = normalizeSchedule(member?.schedule);
     setScheduleMember({ ...member, schedule: normalizedSchedule });
-    setScheduleError("");
     setScheduleForm(buildScheduleForm(normalizedSchedule));
   };
 
   const handleCloseSchedule = () => {
     setScheduleMember(null);
-    setScheduleError("");
   };
 
   const handleToggleDay = day => {
@@ -1172,7 +1150,6 @@ export default function CoachDashboard() {
   const handleSaveSchedule = async () => {
     if (!scheduleMember || !activeCluster || isSavingSchedule) return;
     setIsSavingSchedule(true);
-    setScheduleError("");
 
     try {
       const payload = {
@@ -1210,7 +1187,7 @@ export default function CoachDashboard() {
       });
       handleCloseSchedule();
     } catch (err) {
-      setScheduleError(err?.error ?? "Unable to save schedule.");
+      showToast({ title: "Save Failed", message: err?.error ?? "Unable to save schedule.", type: "error" });
     } finally {
       setIsSavingSchedule(false);
     }
@@ -1219,7 +1196,6 @@ export default function CoachDashboard() {
   const handleAddMember = async () => {
     if (selectedEmployees.length === 0 || isAddingMember || !activeCluster) return;
     setIsAddingMember(true);
-    setMemberError("");
 
     try {
       const added = await apiFetch("api/coach/add_member.php", {
@@ -1259,7 +1235,7 @@ export default function CoachDashboard() {
         )
       );
     } catch (err) {
-      setMemberError(err?.error ?? "Unable to add member(s).");
+      showToast({ title: "Action Failed", message: err?.error ?? "Unable to add member(s).", type: "error" });
     } finally {
       setIsAddingMember(false);
     }
@@ -1276,7 +1252,6 @@ export default function CoachDashboard() {
     if (!hasConfirmed) return;
 
     setIsDeletingMember(true);
-    setMemberError("");
 
     try {
       await apiFetch("api/coach/delete_member.php", {
@@ -1300,8 +1275,9 @@ export default function CoachDashboard() {
             : cluster
         )
       );
+      showToast({ title: "Member Removed", message: `${member.fullname} has been removed from the cluster.`, type: "success" });
     } catch (err) {
-      setMemberError(err?.error ?? "Unable to remove member.");
+      showToast({ title: "Action Failed", message: err?.error ?? "Unable to remove member.", type: "error" });
     } finally {
       setIsDeletingMember(false);
     }
@@ -1505,13 +1481,11 @@ export default function CoachDashboard() {
       tag: entry.tag ?? "",
       note: entry.note ?? ""
     });
-    setAttendanceSaveError("");
   };
 
   const handleSaveTeamAttendanceEdit = async () => {
     if (!selectedAttendanceEntry?.id || !selectedMember?.id || !dashboardCluster?.id) return;
     setIsSavingAttendanceEdit(true);
-    setAttendanceSaveError("");
 
     try {
       await apiFetch("api/coach/coach_update_attendance.php", {
@@ -1552,9 +1526,9 @@ export default function CoachDashboard() {
           });
         }
       }
-      setAttendanceSaveError("Attendance updated successfully.");
+      showToast({ title: "Attendance Updated", message: "Attendance record updated successfully.", type: "success" });
     } catch (err) {
-      setAttendanceSaveError(err?.error ?? "Unable to update attendance record.");
+      showToast({ title: "Update Failed", message: err?.error ?? "Unable to update attendance record.", type: "error" });
     } finally {
       setIsSavingAttendanceEdit(false);
     }
@@ -1567,13 +1541,12 @@ export default function CoachDashboard() {
     fetchTeamRequests()
       .then(response => {
         setTeamRequests(Array.isArray(response) ? response : []);
-        setTeamRequestsError("");
       })
       .catch(() => {
         setTeamRequests([]);
-        setTeamRequestsError("Unable to load file requests.");
+        showToast({ title: "Load Failed", message: "Unable to load team filing requests.", type: "error" });
       });
-  }, [activeNav, canViewAttendance]);
+  }, [activeNav, canViewAttendance, showToast]);
 
   const getTeamRequestActionConfirmationMessage = (request, status) => {
     const requestType = request?.request_type ?? "this request";
@@ -1595,7 +1568,6 @@ export default function CoachDashboard() {
     if (!hasConfirmedAction) return;
 
     setRequestActionLoadingId(request.id);
-    setTeamRequestsError("");
     try {
       await updateTeamRequestStatus({
         request_source: request.request_source,
@@ -1688,7 +1660,6 @@ export default function CoachDashboard() {
                         activeFilter={teamRequestsFilter}
                         onFilterChange={handleHighlightFilterChange(setTeamRequestsFilter)}
                       />
-                      {teamRequestsError && <div className="error">{teamRequestsError}</div>}
                       <DataPanel
                         type="requests"
                         records={filteredTeamRequests}
@@ -1707,11 +1678,10 @@ export default function CoachDashboard() {
                   ) : isTeamClusterAttendanceView ? (
                     <>
                       {activeMembersLoading && <div className="modal-text">Loading attendance records...</div>}
-                      {!activeMembersLoading && activeMembersError && <div className="error">{activeMembersError}</div>}
-                      {!activeMembersLoading && !activeMembersError && !dashboardCluster && (
+                      {!activeMembersLoading && !dashboardCluster && (
                         <div className="empty-state">No active team cluster found. Attendance records will appear once a cluster is active.</div>
                       )}
-                      {!activeMembersLoading && !activeMembersError && dashboardCluster && (
+                      {!activeMembersLoading && dashboardCluster && (
                         <>
                           <div className="section-title">{dashboardCluster.name} Attendance ({attendanceDateFilter})</div>
                           <AttendanceHistoryHighlights 
@@ -1751,7 +1721,6 @@ export default function CoachDashboard() {
                                   onClick={() => {
                                     setSelectedMember(member);
                                     setSelectedAttendanceEntry(null);
-                                    setAttendanceSaveError("");
                                     setHistoryDateStartFilter("");
                                     setHistoryDateEndFilter("");
                                   }}
@@ -1792,14 +1761,14 @@ export default function CoachDashboard() {
               </div>
             )}
             {isTeamClusterAttendanceView && selectedMember && (
-              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setAttendanceSaveError(""); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
+              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
                 <section className="modal-card attendance-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
                   <header className="modal-header">
                     <div>
                       <h3 className="modal-title">{selectedMember.fullname}</h3>
                       <p className="modal-subtitle">Attendance details</p>
                     </div>
-                    <button type="button" className="btn secondary" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setAttendanceSaveError(""); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
+                    <button type="button" className="btn secondary" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
                       Close
                     </button>
                   </header>
@@ -1853,14 +1822,14 @@ export default function CoachDashboard() {
             )}
 
             {isTeamClusterAttendanceView && selectedMember && selectedAttendanceEntry && (
-              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedAttendanceEntry(null); setAttendanceSaveError(""); }}>
+              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedAttendanceEntry(null); }}>
                 <section className="modal-card attendance-edit-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
                   <header className="modal-header">
                     <div>
                       <h3 className="modal-title">Edit Attendance Entry</h3>
                       <p className="modal-subtitle">{selectedMember.fullname}</p>
                     </div>
-                    <button type="button" className="btn secondary" onClick={() => { setSelectedAttendanceEntry(null); setAttendanceSaveError(""); }}>Close</button>
+                    <button type="button" className="btn secondary" onClick={() => { setSelectedAttendanceEntry(null); }}>Close</button>
                   </header>
                   <div className="modal-body">
                     <div className="attendance-history-range-filter" role="group" aria-label="Edit attendance values">
@@ -1877,7 +1846,6 @@ export default function CoachDashboard() {
                     </div>
                     <div className="attendance-edit-actions">
                       <button className="btn primary" type="button" disabled={isSavingAttendanceEdit} onClick={handleSaveTeamAttendanceEdit}>{isSavingAttendanceEdit ? "Saving..." : "Save Attendance"}</button>
-                      {attendanceSaveError && <span className="attendance-detail-value">{attendanceSaveError}</span>}
                     </div>
                   </div>
                 </section>
@@ -2004,7 +1972,6 @@ export default function CoachDashboard() {
                   />
                 </label>
               </div>
-              {error && <div className="error">{error}</div>}
               <div className="form-actions">
                 <button
                   className="btn secondary"
@@ -2116,13 +2083,10 @@ export default function CoachDashboard() {
               {activeMembersLoading && (
                 <div className="modal-text">Loading members...</div>
               )}
-              {!activeMembersLoading && activeMembersError && (
-                <div className="error">{activeMembersError}</div>
-              )}
-              {!activeMembersLoading && !activeMembersError && activeMembers.length === 0 && (
+              {!activeMembersLoading && activeMembers.length === 0 && (
                 <div className="empty-state">No employees added to the active cluster yet.</div>
               )}
-              {!activeMembersLoading && !activeMembersError && displayedActiveMembers.length > 0 && (
+              {!activeMembersLoading && displayedActiveMembers.length > 0 && (
                 <div className="active-members-schedule-table" role="table" aria-label="Active team schedule">
                   <div className="active-members-schedule-header" role="row">
                     <span role="columnheader">Members</span>
@@ -2262,7 +2226,6 @@ export default function CoachDashboard() {
                     ))}
                   </div>
                 )}
-                {memberError && <div className="error">{memberError}</div>}
                 <div className="member-actions">
                   <button
                     className="btn primary"
@@ -2276,14 +2239,12 @@ export default function CoachDashboard() {
                     <span className="modal-text">Loading employees...</span>
                   )}
                   {!employeeLoading &&
-                    availableEmployees.length === 0 &&
-                    !employeeError && (
+                    availableEmployees.length === 0 && (
                       <span className="modal-text">
                         All employees are already assigned.
                       </span>
                     )}
                 </div>
-                {employeeError && <div className="error">{employeeError}</div>}
                 {showMemberForm && availableEmployees.length > 0 && (
                  <div className="member-form manage-team-form-card">
                     <div className="member-form-head">
@@ -2553,7 +2514,6 @@ export default function CoachDashboard() {
                   </div>
                 </div>
                 <div className="form-actions">
-                  {scheduleError && <div className="error">{scheduleError}</div>}
                   <button
                     className="btn secondary"
                     type="button"

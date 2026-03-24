@@ -95,7 +95,7 @@ export default function SuperAdminDashboard() {
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
-  const { confirm } = useFeedback();
+  const { confirm, showToast } = useFeedback();
   const { hasPermission } = usePermissions();
   const {
     canViewDashboard,
@@ -362,7 +362,7 @@ export default function SuperAdminDashboard() {
     );
   };
 
-  const persistAttendance = async nextAttendance => {
+  const persistAttendance = async (nextAttendance, actionType) => {
     setIsSavingAttendance(true);
 
     try {
@@ -382,7 +382,19 @@ export default function SuperAdminDashboard() {
       };
 
       setAttendanceLog(savedAttendance);
+      showToast({
+        title: actionType === "in" ? "Clock-In Successful" : "Clock-Out Successful",
+        message: `You have successfully clocked ${actionType === "in" ? "in" : "out"} for today.`,
+        type: "success"
+      });
       return savedAttendance;
+    } catch (error) {
+      showToast({
+        title: actionType === "in" ? "Clock-In Failed" : "Clock-Out Failed",
+        message: error?.error ?? error?.message ?? `Unable to process clock-${actionType}.`,
+        type: "error"
+      });
+      throw error;
     } finally {
       setIsSavingAttendance(false);
     }
@@ -400,7 +412,7 @@ export default function SuperAdminDashboard() {
       timeInAt: now,
       timeOutAt: null,
       tag
-    });
+    }, "in");
 
     if (activeNav === "Attendance") {
       const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
@@ -414,7 +426,7 @@ export default function SuperAdminDashboard() {
     await persistAttendance({
       ...attendanceLog,
       timeOutAt: new Date()
-    });
+    }, "out");
 
     if (activeNav === "Attendance") {
       const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
@@ -450,8 +462,17 @@ export default function SuperAdminDashboard() {
       });
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
+      showToast({
+        title: "Status Updated",
+        message: `Request for ${request.employee_name} has been ${status.toLowerCase()} successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to finalize file request status.");
+      showToast({
+        title: "Action Failed",
+        message: error?.error ?? error?.message ?? "Unable to finalize file request status.",
+        type: "error"
+      });
     } finally {
       setRequestActionLoadingId("");
     }
@@ -557,9 +578,17 @@ export default function SuperAdminDashboard() {
         });
       }
 
-      setEditAttendanceMessage("Attendance updated successfully.");
+      showToast({
+        title: "Attendance Updated",
+        message: "Attendance record updated successfully.",
+        type: "success"
+      });
     } catch (error) {
-      setEditAttendanceMessage(error?.error ?? "Unable to update attendance record.");
+      showToast({
+        title: "Update Failed",
+        message: error?.error ?? "Unable to update attendance record.",
+        type: "error"
+      });
     } finally {
       setIsSavingEditAttendance(false);
     }
@@ -706,9 +735,18 @@ export default function SuperAdminDashboard() {
         })
       });
       await fetchClusters();
+      showToast({
+        title: "Schedule Saved",
+        message: "Team coach schedule has been updated successfully.",
+        type: "success"
+      });
       handleCloseScheduleModal();
     } catch (error) {
-      setScheduleModalMessage(error?.error ?? "Unable to save schedule.");
+      showToast({
+        title: "Save Failed",
+        message: error?.error ?? "Unable to save schedule.",
+        type: "error"
+      });
     } finally {
       setIsSavingSchedule(false);
     }
@@ -1097,7 +1135,6 @@ const handleOpenRejectModal = cluster => {
               </div>
               <div className="attendance-edit-actions">
                 <button className="btn primary" type="button" disabled={isSavingEditAttendance} onClick={saveCoachAttendanceEdit}>{isSavingEditAttendance ? "Saving..." : "Save Attendance"}</button>
-                {editAttendanceMessage && <span className="attendance-detail-value">{editAttendanceMessage}</span>}
               </div>
             </div>
           </section>
@@ -1287,7 +1324,6 @@ const handleOpenRejectModal = cluster => {
                   })}
                 </div>
               </div>
-              {scheduleModalMessage && <div className="success-message">{scheduleModalMessage}</div>}
               <div className="form-actions">
                 <button className="btn secondary" type="button" onClick={handleCloseScheduleModal}>
                   Cancel
