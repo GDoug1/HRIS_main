@@ -11,7 +11,7 @@ import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import ProfileSection from "../components/ProfileSection";
-import { buildRequestHighlights, fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
+import { fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
@@ -20,6 +20,8 @@ import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
 import { useFeedback } from "../components/FeedbackContext";
 import { formatFullDate, formatDateTime } from "../utils/dateUtils";
+import { buildAttendanceHighlights, buildRequestHighlights, HIGHLIGHT_IDS } from "../utils/highlightUtils";
+import { Users, LogIn, CheckCircle } from "lucide-react";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -1277,18 +1279,69 @@ export default function CoachDashboard() {
   };
 
   const isTeamClusterAttendanceView = activeNav === "Team Cluster Attendance";
-  const isMyRequestsView = activeNav === "My Requests";
-  const isTeamRequestView = activeNav === "File Request";
-  const myRequestHighlights = buildRequestHighlights(myRequests);
-  const teamRequestHighlights = buildRequestHighlights(teamRequests);
+  const [myRequestsFilter, setMyRequestsFilter] = useState(null);
+  const [teamRequestsFilter, setTeamRequestsFilter] = useState(null);
+  const [teamAttendanceFilter, setTeamAttendanceFilter] = useState(null);
+
+  const filteredMyRequests = useMemo(() => {
+    if (!myRequestsFilter || myRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return myRequests;
+    return myRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (myRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (myRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (myRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [myRequests, myRequestsFilter]);
+
+  const filteredTeamRequests = useMemo(() => {
+    if (!teamRequestsFilter || teamRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return teamRequests;
+    return teamRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (teamRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [teamRequests, teamRequestsFilter]);
+
+  const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
+  const teamRequestHighlights = useMemo(() => buildRequestHighlights(teamRequests), [teamRequests]);
+
   const isFilingCenterView = activeNav === "My Filing Center";
   const attendanceViewTitle = activeNav === "Team Cluster Attendance" ? "Team Cluster Attendance" : "My Attendance";
+
+  const handleHighlightFilterChange = (setter) => (id) => {
+    setter(current => current === id ? null : id);
+  };
+
+  const teamAttendanceHighlights = useMemo(() => {
+    const total = attendanceRows.length;
+    const timedIn = attendanceRows.filter(member => member.time_in_at && !member.time_out_at).length;
+    const completed = attendanceRows.filter(member => member.time_in_at && member.time_out_at).length;
+    const pending = total - (timedIn + completed);
+
+    return [
+      { key: 'total', label: 'Employees', value: total, icon: Users, accentClass: 'is-slate', subValue: 'Total roster' },
+      { key: 'timed-in', label: 'Timed In', value: timedIn, icon: LogIn, accentClass: 'is-blue', subValue: 'Active now' },
+      { key: 'completed', label: 'Completed', value: completed, icon: CheckCircle, accentClass: 'is-green', subValue: 'Shift finished' }
+    ];
+  }, [attendanceRows]);
+
   const filteredAttendanceRows = useMemo(() => {
     const query = attendanceQuery.trim().toLowerCase();
-    const filteredRows = attendanceRows.filter(member => {
+    const baseFiltered = attendanceRows.filter(member => {
       const name = member.fullname?.toLowerCase() ?? "";
       const tag = member.attendance_tag?.toLowerCase() ?? "";
-      return name.includes(query) || tag.includes(query);
+      const matchesQuery = name.includes(query) || tag.includes(query);
+
+      if (!matchesQuery) return false;
+
+      if (!teamAttendanceFilter) return true;
+      if (teamAttendanceFilter === 'total') return true;
+      if (teamAttendanceFilter === 'timed-in') return !!member.time_in_at && !member.time_out_at;
+      if (teamAttendanceFilter === 'completed') return !!member.time_in_at && !!member.time_out_at;
+      return true;
     });
 
     const getTimestamp = member => {
@@ -1589,16 +1642,24 @@ export default function CoachDashboard() {
                 <div className="employee-card-body">
                   {isMyRequestsView ? (
                     <>
-                      <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                      <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
+                      <AttendanceHistoryHighlights 
+                        highlights={myRequestHighlights} 
+                        activeFilter={myRequestsFilter}
+                        onFilterChange={handleHighlightFilterChange(setMyRequestsFilter)}
+                      />
+                      <DataPanel type="requests" records={filteredMyRequests} enableRequestFilters showRequestActionBy />
                     </>
                   ) : isTeamRequestView ? (
                     <>
-                      <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
+                      <AttendanceHistoryHighlights 
+                        highlights={teamRequestHighlights} 
+                        activeFilter={teamRequestsFilter}
+                        onFilterChange={handleHighlightFilterChange(setTeamRequestsFilter)}
+                      />
                       {teamRequestsError && <div className="error">{teamRequestsError}</div>}
                       <DataPanel
                         type="requests"
-                        records={teamRequests}
+                        records={filteredTeamRequests}
                         onRequestAction={handleTeamRequestAction}
                         requestActionLoadingId={requestActionLoadingId}
                         requestActions={[
@@ -1621,11 +1682,11 @@ export default function CoachDashboard() {
                       {!activeMembersLoading && !activeMembersError && dashboardCluster && (
                         <>
                           <div className="section-title">{dashboardCluster.name} Attendance ({attendanceDateFilter})</div>
-                          <div className="attendance-summary-grid">
-                            <div className="overview-card"><div className="overview-label">Employees</div><div className="overview-value">{attendanceSummary.total}</div></div>
-                            <div className="overview-card"><div className="overview-label">Timed In</div><div className="overview-value">{attendanceSummary.timedIn}</div></div>
-                            <div className="overview-card"><div className="overview-label">Completed Shift</div><div className="overview-value">{attendanceSummary.completed}</div></div>
-                          </div>
+                          <AttendanceHistoryHighlights 
+                            highlights={teamAttendanceHighlights} 
+                            activeFilter={teamAttendanceFilter}
+                            onFilterChange={handleHighlightFilterChange(setTeamAttendanceFilter)}
+                          />
                           <div className="employee-list-controls">
                             <label className="employee-search-field" htmlFor="attendance-search-input">
                               <span className="employee-control-label">Search</span>

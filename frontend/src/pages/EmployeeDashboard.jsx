@@ -18,6 +18,7 @@ import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
+import { buildAttendanceHighlights, HIGHLIGHT_IDS, buildRequestHighlights as buildUnifiedRequestHighlights } from "../utils/highlightUtils";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
@@ -76,7 +77,24 @@ export default function EmployeeDashboard() {
   });
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
+  const [myRequestsFilter, setMyRequestsFilter] = useState(null);
+
+  const filteredMyRequests = useMemo(() => {
+    if (!myRequestsFilter || myRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return myRequests;
+    return myRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (myRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (myRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (myRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [myRequests, myRequestsFilter]);
+
   const activeCluster = data[0];
+
+  const handleHighlightFilterChange = (setter) => (id) => {
+    setter(current => current === id ? null : id);
+  };
 
 
   useEffect(() => {
@@ -447,7 +465,7 @@ export default function EmployeeDashboard() {
   }, [canViewAttendance, canViewTeam]);
 
 
-  const myRequestHighlights = buildRequestHighlights(myRequests);
+  const myRequestHighlights = useMemo(() => buildUnifiedRequestHighlights(myRequests), [myRequests]);
 
   // const handleLogout = async () => {
   //   try {
@@ -524,8 +542,12 @@ export default function EmployeeDashboard() {
                     <div className="employee-card-title">My Requests</div>
                   </div>
                   <div className="employee-card-body">
-                    <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                    <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
+                    <AttendanceHistoryHighlights 
+                      highlights={myRequestHighlights} 
+                      activeFilter={myRequestsFilter}
+                      onFilterChange={handleHighlightFilterChange(setMyRequestsFilter)}
+                    />
+                    <DataPanel type="requests" records={filteredMyRequests} enableRequestFilters showRequestActionBy />
                   </div>
                 </div>
               )}

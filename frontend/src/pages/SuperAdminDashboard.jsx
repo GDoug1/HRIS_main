@@ -14,51 +14,11 @@ import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
 import ProfileSection from "../components/ProfileSection";
-import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
+import { fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 import { logout } from "../utils/logout";
-import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
+import { normalizeAttendanceHistoryRecords, parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { useFeedback } from "../components/FeedbackContext";
-
-const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
-
-const parseAttendanceDate = value => {
-  if (!value) return null;
-  const parsed = new Date(String(value).replace(" ", "T"));
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const buildAllAttendanceHighlights = records => {
-  const totals = (Array.isArray(records) ? records : []).reduce((acc, row) => {
-    const timeIn = parseAttendanceDate(row?.time_in_at);
-    const timeOut = parseAttendanceDate(row?.time_out_at);
-    const status = String(row?.attendance_tag ?? row?.tag ?? "").toLowerCase();
-
-    if (timeIn && timeOut && timeOut >= timeIn) {
-      acc.totalHours += (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
-    }
-
-    if (timeIn) {
-      acc.daysPresent.add(`${row?.user_id ?? row?.employee_id ?? "unknown"}-${timeIn.toISOString().slice(0, 10)}`);
-    }
-
-    if (status.includes("late")) acc.totalLate += 1;
-    if (status.includes("overtime") || status.includes("over time")) acc.overtime += 1;
-    return acc;
-  }, {
-    totalHours: 0,
-    daysPresent: new Set(),
-    totalLate: 0,
-    overtime: 0
-  });
-
-  return [
-    { key: "totalHours", label: "Total Hours", icon: "◷", accentClass: "is-slate", value: totals.totalHours.toFixed(2), subValue: "Calculated from logs" },
-    { key: "daysPresent", label: "Days Present", icon: "◉", accentClass: "is-green", value: totals.daysPresent.size, subValue: "Logged attendance days" },
-    { key: "totalLate", label: "Total Late", icon: "!", accentClass: "is-amber", value: totals.totalLate, subValue: "Requires attention" },
-    { key: "overtime", label: "Overtime", icon: "↗", accentClass: "is-blue", value: totals.overtime, subValue: "Tagged overtime logs" },
-  ];
-};
 
 export default function SuperAdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -798,9 +758,28 @@ const handleOpenRejectModal = cluster => {
     }
   };
 
-  const myRequestHighlights = buildRequestHighlights(myRequests);
-  const teamRequestHighlights = buildRequestHighlights(teamRequests);
-  const allAttendanceHighlights = useMemo(() => buildAllAttendanceHighlights(allAttendance), [allAttendance]);
+  const [myRequestsFilter, setMyRequestsFilter] = useState(null);
+  const [teamRequestsFilter, setTeamRequestsFilter] = useState(null);
+  const [allAttendanceFilter, setAllAttendanceFilter] = useState(null);
+
+  const filteredAllAttendance = useMemo(() => {
+    const normalized = normalizeAttendanceHistoryRecords(allAttendance);
+    if (!allAttendanceFilter || allAttendanceFilter === HIGHLIGHT_IDS.TOTAL_HOURS || allAttendanceFilter === HIGHLIGHT_IDS.DAYS_PRESENT) return normalized;
+    return normalized.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (allAttendanceFilter === HIGHLIGHT_IDS.LATE) return status.includes("late");
+      if (allAttendanceFilter === HIGHLIGHT_IDS.OVERTIME) return status.includes("overtime") || status.includes("over time");
+      return true;
+    });
+  }, [allAttendance, allAttendanceFilter]);
+
+  const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
+  const teamRequestHighlights = useMemo(() => buildRequestHighlights(teamRequests), [teamRequests]);
+  const allAttendanceHighlights = useMemo(() => buildAttendanceHighlights(normalizeAttendanceHistoryRecords(allAttendance)), [allAttendance]);
+
+  const handleHighlightFilterChange = (setter) => (id) => {
+    setter(current => current === id ? null : id);
+  };
 
   const formatDate = dateString => {
     if (!dateString) return "—";
@@ -926,10 +905,14 @@ const handleOpenRejectModal = cluster => {
                 <p className="employee-card-subtitle">Review all attendance logs across employees and coaches with the same polished summary view used in My Attendance.</p>
               </div>
               <div className="employee-card-body">
-                <AttendanceHistoryHighlights highlights={allAttendanceHighlights} />
+                <AttendanceHistoryHighlights
+                  highlights={allAttendanceHighlights}
+                  activeFilter={allAttendanceFilter}
+                  onFilterChange={handleHighlightFilterChange(setAllAttendanceFilter)}
+                />
                 <DataPanel
                   type="attendance"
-                  records={allAttendance}
+                  records={filteredAllAttendance}
                   personField="employee_name"
                   personLabel="Name"
                   onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
@@ -942,8 +925,12 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "My Requests" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Requests</div>
-            <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-            <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
+            <AttendanceHistoryHighlights
+              highlights={myRequestHighlights}
+              activeFilter={myRequestsFilter}
+              onFilterChange={handleHighlightFilterChange(setMyRequestsFilter)}
+            />
+            <DataPanel type="requests" records={filteredMyRequests} enableRequestFilters showRequestActionBy />
           </section>
         ) : activeNav === "My Filing Center" && canViewAttendance ? (
           <section className="content">
@@ -953,11 +940,15 @@ const handleOpenRejectModal = cluster => {
           <section className="content">
             <div className="section-title">File Requests</div>
             <p className="table-subtitle">Endorsed file requests waiting for final admin approval or rejection.</p>
-            <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
+            <AttendanceHistoryHighlights
+              highlights={teamRequestHighlights}
+              activeFilter={teamRequestsFilter}
+              onFilterChange={handleHighlightFilterChange(setTeamRequestsFilter)}
+            />
             {teamRequestsError && <div className="error">{teamRequestsError}</div>}
             <DataPanel
               type="requests"
-              records={teamRequests}
+              records={filteredTeamRequests}
               onRequestAction={handleAdminTeamRequestAction}
               requestActionLoadingId={requestActionLoadingId}
               requestActions={[
