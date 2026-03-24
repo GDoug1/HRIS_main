@@ -9,14 +9,44 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { FeedbackProvider } from "./components/FeedbackProvider";
+import useCurrentUser from "./hooks/useCurrentUser";
+import { getHomeRouteForRole } from "./utils/roleRoutes";
+
+function DefaultRoute() {
+  const { user, loading } = useCurrentUser();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={getHomeRouteForRole(user.role)} replace />;
+}
+
+function LoginRoute() {
+  const { user, loading } = useCurrentUser();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (user) {
+    return <Navigate to={getHomeRouteForRole(user.role)} replace />;
+  }
+
+  return <Login />;
+}
 
 export default function App() {
   return (
     <FeedbackProvider>
       <Routes>
         {/* PUBLIC */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<DefaultRoute />} />
+        <Route path="/login" element={<LoginRoute />} />
         <Route path="/register" element={<Register />} />
 
         {/* PROTECTED */}
@@ -66,7 +96,7 @@ export default function App() {
         />
 
         {/* FALLBACK */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<DefaultRoute />} />
       </Routes>
     </FeedbackProvider>
   );

@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import useCurrentUser from "../hooks/useCurrentUser";
+import { getHomeRouteForRole } from "../utils/roleRoutes";
 
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useCurrentUser();
@@ -13,7 +14,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/employee" replace />;
+    return <Navigate to={getHomeRouteForRole(user.role)} replace />;
   }
 
   return children;
