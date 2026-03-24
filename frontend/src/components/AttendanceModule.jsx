@@ -1,31 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Calendar, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { Search, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
 import { normalizeAttendanceHistoryRecords } from '../api/attendance';
-import { formatDateTime, formatFullDate } from '../utils/dateUtils';
+import { formatFullDate } from '../utils/dateUtils';
+import AttendanceHistoryHighlights from './AttendanceHistoryHighlights';
+import { buildAttendanceHighlights, HIGHLIGHT_IDS } from '../utils/highlightUtils';
 import '../styles/AttendanceModule.css';
-
-const StatCard = ({ title, value, delta, icon, colorClass, isOffline }) => {
-  const IconComponent = icon;
-  return (
-    <div className="am-stat-card">
-      <div className="am-stat-header">
-        <span className="am-stat-title">{title}</span>
-        <div className="am-stat-icon-wrapper" style={{ backgroundColor: colorClass }}>
-          <IconComponent />
-        </div>
-      </div>
-      <div className="am-stat-value" style={{ color: isOffline ? '#cbd5e1' : undefined }}>
-        {isOffline ? "--" : value}
-      </div>
-      <div className="am-stat-delta">{isOffline ? "N/A" : delta}</div>
-    </div>
-  );
-};
 
 const getStatusColor = (status) => {
   const s = String(status).toLowerCase();
-  if (['present', 'approved'].includes(s)) return '#52c41a';
+  if (['present', 'approved', 'on time'].includes(s)) return '#52c41a';
   if (['absent', 'denied'].includes(s)) return '#f5222d';
   if (s === 'late') return '#faad14';
   if (s === 'pending') return '#1890ff';
@@ -77,6 +61,7 @@ export default function AttendanceModule({
   const [currentPage, setCurrentPage] = useState(1);
   const [sortKey, setSortKey] = useState("Date");
   const [sortDirection, setSortDirection] = useState("desc");
+  const [activeHighlightFilter, setActiveHighlightFilter] = useState(null);
 
   const isControlled = Array.isArray(records);
   const rawData = isControlled ? records : historyState.data;
@@ -84,20 +69,7 @@ export default function AttendanceModule({
   const loading = isControlled ? loadingProp : historyState.loading;
   const error = isControlled ? errorProp : historyState.error;
 
-  const stats = useMemo(() => {
-    if (!data.length) return { hours: '0.00', present: 0, late: 0, ot: '0.00' };
-    
-    const totalHrs = data.reduce((acc, curr) => acc + parseFloat(curr.total_hours || 0), 0);
-    const presentCount = data.filter(r => ['present', 'approved'].includes(r.status.toLowerCase())).length;
-    const lateCount = data.filter(r => r.status.toLowerCase() === 'late').length;
-    
-    return {
-      hours: totalHrs.toFixed(2),
-      present: presentCount,
-      late: lateCount,
-      ot: '0.00' 
-    };
-  }, [data]);
+  const highlights = useMemo(() => buildAttendanceHighlights(data), [data]);
 
   const handleSort = key => {
     if (sortKey === key) {
@@ -108,12 +80,26 @@ export default function AttendanceModule({
     }
   };
 
+  const handleHighlightFilterChange = (id) => {
+    setActiveHighlightFilter(current => current === id ? null : id);
+    setCurrentPage(1);
+  };
+
   const filteredAndSortedData = useMemo(() => {
     let result = data.filter(item => {
+      // 1. Highlight Filtering
+      if (activeHighlightFilter && activeHighlightFilter !== HIGHLIGHT_IDS.TOTAL_HOURS && activeHighlightFilter !== HIGHLIGHT_IDS.DAYS_PRESENT) {
+        const status = String(item.status || "").toLowerCase();
+        if (activeHighlightFilter === HIGHLIGHT_IDS.TOTAL_LATE && status !== "late") return false;
+        if (activeHighlightFilter === HIGHLIGHT_IDS.OVERTIME && !(status.includes("overtime") || status.includes("over time"))) return false;
+      }
+
+      // 2. Date Range Filtering
       const entryDate = toDateInputValue(item.date);
       if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
       if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
 
+      // 3. Search Query Filtering
       const haystack = [
         item.date,
         item.time_in,
@@ -151,7 +137,7 @@ export default function AttendanceModule({
     }
 
     return result;
-  }, [data, searchQuery, dateStartFilter, dateEndFilter, sortKey, sortDirection]);
+  }, [data, searchQuery, dateStartFilter, dateEndFilter, sortKey, sortDirection, activeHighlightFilter]);
 
   const parsedRowsPerPage = Number.parseInt(rowsPerPageInput, 10);
   const rowsPerPage = Number.isFinite(parsedRowsPerPage) && parsedRowsPerPage > 0 ? parsedRowsPerPage : 10;
@@ -177,6 +163,7 @@ export default function AttendanceModule({
     setSearchQuery("");
     setDateStartFilter("");
     setDateEndFilter("");
+    setActiveHighlightFilter(null);
     setCurrentPage(1);
   };
 
@@ -202,12 +189,11 @@ export default function AttendanceModule({
         </div>
       )}
 
-      <div className="am-stats-grid">
-        <StatCard title="Total Hours" value={stats.hours} delta="Calculated from logs" icon={Clock} colorClass="#64748b" isOffline={!!error} />
-        <StatCard title="Days Present" value={stats.present} delta="Count of active shifts" icon={CheckCircle2} colorClass="#52c41a" isOffline={!!error} />
-        <StatCard title="Total Late" value={stats.late} delta="Requires attention" icon={AlertCircle} colorClass="#faad14" isOffline={!!error} />
-        <StatCard title="Overtime" value={stats.ot} delta="Pending approval" icon={ArrowUpRight} colorClass="#1890ff" isOffline={!!error} />
-      </div>
+      <AttendanceHistoryHighlights
+        highlights={highlights}
+        activeFilter={activeHighlightFilter}
+        onFilterChange={handleHighlightFilterChange}
+      />
 
       <div className="am-content-panel">
         <div className="am-toolbar">
