@@ -888,6 +888,25 @@ body {
   border-bottom: none;
 }
 
+.team-coach-overview-table .table-header,
+.team-coach-overview-table .table-row {
+  grid-template-columns: minmax(220px, 1.45fr) minmax(160px, 1fr) minmax(110px, 0.7fr) minmax(120px, 0.7fr) minmax(260px, 1.4fr);
+  min-width: 900px;
+}
+
+.team-coach-overview-table .table-header {
+  gap: 10px;
+}
+
+.team-coach-overview-table .table-row {
+  gap: 10px;
+}
+
+.team-coach-action-cell {
+  display: flex;
+  align-items: center;
+}
+
 .employee-list-toolbar {
   display: flex;
   justify-content: space-between;
