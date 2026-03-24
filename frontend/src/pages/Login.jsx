@@ -37,7 +37,7 @@ export default function Login() {
         );
       }
 
-      const redirectPath = data.redirect || getHomeRouteForRole(data.role);
+      const redirectPath = getHomeRouteForRole(data.role);
 
       navigate(redirectPath);
     } catch (err) {
