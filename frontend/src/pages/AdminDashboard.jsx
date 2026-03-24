@@ -1046,7 +1046,7 @@ const handleOpenRejectModal = cluster => {
               <div className="empty-state">No team clusters available.</div>
             ) : (
               <>
-                <div className="table-card">
+                <div className="table-card team-coach-overview-table">
                   <div className="table-header">
                     <div>Coach</div>
                     <div>Cluster Name</div>
@@ -1064,7 +1064,7 @@ const handleOpenRejectModal = cluster => {
                       <div className="table-cell">
                         <span className={`badge ${cluster.status}`}>{cluster.status}</span>
                       </div>
-                      <div className="table-cell">
+                      <div className="table-cell team-coach-action-cell">
                         <button className="btn primary team-coach-manage-btn" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
                           Manage Schedule (Team Coach)
                         </button>
