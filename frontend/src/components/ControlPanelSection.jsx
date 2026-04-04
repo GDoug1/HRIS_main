@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
-import { useFeedback } from "./FeedbackProvider";
+import { useFeedback } from "./FeedbackContext";
 
 const RESTRICTED_PERMISSIONS_BY_ROLE = {
   employee: new Set([
@@ -38,14 +38,10 @@ function getEditablePermissionOptions(roleName, permissionOptions) {
 
 function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions, onClose, onSave, isSaving = false, errorMessage = "" }) {
   const [draftPermissionIds, setDraftPermissionIds] = useState(selectedPermissionIds);
-  const selectedPermissionKey = useMemo(
-    () => [...selectedPermissionIds].sort((a, b) => a - b).join(","),
-    [selectedPermissionIds]
-  );
 
   useEffect(() => {
     setDraftPermissionIds(selectedPermissionIds);
-  }, [selectedPermissionKey]);
+  }, [selectedPermissionIds]);
 
   const togglePermission = permissionId => {
     setDraftPermissionIds(current => {
@@ -85,9 +81,8 @@ function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions
 }
 
 function LogDetailsModal({ log, onClose }) {
-  if (!log) return null;
-
   useEffect(() => {
+    if (!log) return;
     const handleKeyDown = event => {
       if (event.key === "Escape") {
         onClose();
@@ -96,7 +91,9 @@ function LogDetailsModal({ log, onClose }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [log, onClose]);
+
+  if (!log) return null;
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Log details" onClick={onClose}>

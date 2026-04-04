@@ -1,15 +1,13 @@
-import { useMemo, useState } from "react";
-import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
+import { useMemo, useState, useCallback } from "react";
+import { Loader2 } from "lucide-react";
+import { normalizeAttendanceHistoryRecord } from "../api/attendance";
+import { formatDateTime } from "../utils/dateUtils";
+import { useFeedback } from "./FeedbackContext";
+import UnifiedTable from "./shared/UnifiedTable";
 
 const normalizeRequestDetails = value => {
   const text = String(value ?? "").trim();
   return text || "—";
-};
-
-const truncateRequestDetails = (value, maxLength = 72) => {
-  const details = normalizeRequestDetails(value);
-  if (details === "—" || details.length <= maxLength) return details;
-  return `${details.slice(0, maxLength).trimEnd()}…`;
 };
 
 const resolveRequestPhotoUrl = value => {
@@ -18,6 +16,56 @@ const resolveRequestPhotoUrl = value => {
   if (/^https?:\/\//i.test(text)) return text;
   const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost/team-cluster2/backend").replace(/\/$/, "");
   return `${baseUrl}/${text.replace(/^\/+/, "")}`;
+};
+
+const toDateInputValue = value => {
+  if (!value) return null;
+  const str = String(value).trim();
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const parsed = new Date(str.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getPersonPrimaryValue = (item, personField) => {
+  if (!personField) return "—";
+  const record = item.raw ?? item;
+  return record[personField] ?? "—";
+};
+
+const getPersonSecondaryValue = (item, personField) => {
+  if (!personField) return null;
+  const record = item.raw ?? item;
+  if (personField === "employee_name") return record.employee_username || null;
+  if (personField === "username") return record.user_name || null;
+  return null;
+};
+
+const formatAttendanceDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+};
+
+const formatAttendanceTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
 };
 
 const panelConfig = {
@@ -33,90 +81,19 @@ const panelConfig = {
     title: "My Requests",
     filterLabel: "Filter Type",
     searchPlaceholder: "Search requests, reasons, status...",
-    columns: ["Date Filed", "Request Type", "Details", "Schedule / Period", "Status", "Actions"],
+    columns: ["Date Filed", "Filed By", "Request Type", "Details", "Schedule / Period", "Status", "Endorsed By", "Approved By", "Actions"],
     messageTitle: "Unable to load requests",
     messageSubtitle: "Please try again in a few moments."
   }
 };
 
-const formatDateTimeLabel = value => {
-  if (!value) return "—";
-  const date = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-};
-
-
-const formatRequestActionDate = value => {
-  if (!value) return "—";
-  const date = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-};
-
-const formatAttendanceDate = value => {
-  if (!value) return "—";
-  const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleDateString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
-};
-
-const formatAttendanceTime = value => {
-  if (!value) return "—";
-  const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-};
-
-const getPersonPrimaryValue = (item, field) => {
-  const value = String(item?.[field] ?? "").trim();
-  return value || "—";
-};
-
-const getPersonSecondaryValue = (item, field) => {
-  const candidates = [
-    item?.person_secondary_name,
-    item?.employee_username,
-    item?.username,
-    item?.user_name,
-    item?.email,
-  ];
-  const secondaryValue = candidates
-    .map(value => String(value ?? "").trim())
-    .find(Boolean);
-
-  if (!secondaryValue) return "";
-  const primaryValue = getPersonPrimaryValue(item, field);
-  return secondaryValue.toLowerCase() === primaryValue.toLowerCase() ? "" : secondaryValue;
-};
-
-const toDateInputValue = value => {
-  if (!value) return null;
-  const parsed = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return null;
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
-  const day = `${parsed.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const getStatusColor = (status) => {
+  const s = String(status).toLowerCase();
+  if (['present', 'approved', 'on time', 'complete'].includes(s)) return '#52c41a';
+  if (['absent', 'denied', 'rejected'].includes(s)) return '#f5222d';
+  if (s === 'late') return '#faad14';
+  if (s === 'pending') return '#1890ff';
+  return '#cbd5e1';
 };
 
 export default function DataPanel({
@@ -132,14 +109,18 @@ export default function DataPanel({
   requestActions = null,
   enableRequestFilters = false,
   showRequestActionBy = false,
+  loading = false,
+  error = null,
 }) {
+  const { confirm } = useFeedback();
   const config = panelConfig[type] ?? panelConfig.attendance;
   const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
     ? requestActions
     : [
-      { label: "Endorse", status: "Approved", variant: "btn", allowedStatuses: ["pending"] },
-      { label: "Reject", status: "Rejected", variant: "btn secondary", allowedStatuses: ["pending"] }
+      { label: "Endorse", status: "Approved", variant: "am-action-btn primary", allowedStatuses: ["pending"] },
+      { label: "Reject", status: "Rejected", variant: "am-action-btn secondary", allowedStatuses: ["pending"] }
     ];
+
   const [searchQuery, setSearchQuery] = useState("");
   const [dateStartFilter, setDateStartFilter] = useState("");
   const [dateEndFilter, setDateEndFilter] = useState("");
@@ -148,34 +129,95 @@ export default function DataPanel({
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rowsPerPageInput, setRowsPerPageInput] = useState("10");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState(type === "attendance" ? "Date" : "Date Filed");
+  const [sortDirection, setSortDirection] = useState("desc");
+
+  const handleSort = key => {
+    if (sortKey === key) {
+      setSortDirection(current => (current === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("desc");
+    }
+  };
+
+  const getSortValue = useCallback((item, key) => {
+    const record = item.raw ?? item;
+    if (type === "attendance") {
+      const normalizedAttendance = normalizeAttendanceHistoryRecord(record);
+      if (key === "Date") return new Date(record.time_in_at ?? record.time_out_at ?? record.updated_at ?? record.attendance_updated_at ?? record.attendance_date ?? 0).getTime();
+      if (key === "Time In") return new Date(record.time_in_at ?? 0).getTime();
+      if (key === "Time Out") return new Date(record.time_out_at ?? 0).getTime();
+      if (key === "Total Hours") return Number(normalizedAttendance.total_hours || 0);
+      if (key === "Status") return String(record.attendance_tag ?? record.tag ?? record.status ?? "").toLowerCase();
+      if (key === "Cluster") return String(record.cluster_name ?? "").toLowerCase();
+      if (key === "person") return String(record[personField] ?? "").toLowerCase();
+      return String(record[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
+    }
+    if (type === "requests") {
+      if (key === "Date Filed") return new Date(record.date_filed ?? 0).getTime();
+      if (key === "person") return String(record[personField] ?? "").toLowerCase();
+      if (key === "Status") return String(record.status ?? "").toLowerCase();
+      if (key === "Request Type") return String(record.request_type ?? "").toLowerCase();
+      return String(record[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
+    }
+    return "";
+  }, [type, personField]);
+
+  const handleActionClick = async (item, action) => {
+    if (!onRequestAction) return;
+
+    const record = item.raw ?? item;
+    const isApproval = action.status === "Approved" || action.status === "Endorsed";
+    const isDenial =
+      action.status.toLowerCase().includes("reject") ||
+      action.status.toLowerCase().includes("denied") ||
+      action.status.toLowerCase().includes("decline");
+
+    const hasConfirmedAction = await confirm({
+      title: isApproval ? `Confirm ${action.label}` : isDenial ? `Confirm ${action.label}` : "Confirm request action",
+      message: `Are you sure you want to ${action.label.toLowerCase()} this request?`,
+      confirmLabel: action.label,
+      variant: isDenial ? "danger" : "primary"
+    });
+    if (!hasConfirmedAction) return;
+
+    onRequestAction(record, action.status);
+  };
 
   const requestTypeOptions = useMemo(() => ([
     "all",
-    ...new Set(records.map(item => String(item.request_type ?? "").trim()).filter(Boolean))
-  ]), [records]);
+    "Forget Time In/Out",
+    "System Error",
+    "Official Business",
+    "Incorrect Status",
+    "Breaktime/Lunch",
+    "Sick Leave",
+    "Emergency Leave",
+    "Vacation Leave",
+    "Regular Overtime",
+    "Duty on Rest Day",
+    "Duty on Rest Day OT"
+  ]), []);
 
   const requestStatusOptions = useMemo(() => ([
     "all",
     ...new Set(records.map(item => String(item.status ?? "").trim()).filter(Boolean))
   ]), [records]);
 
-  const parsedRowsPerPage = Number.parseInt(rowsPerPageInput, 10);
-  const rowsPerPage = Number.isFinite(parsedRowsPerPage) && parsedRowsPerPage > 0 ? parsedRowsPerPage : 10;
-
-  const handleRowsPerPageChange = event => {
-    const nextValue = event.target.value.replace(/[^0-9]/g, "");
-    setRowsPerPageInput(nextValue);
-    setCurrentPage(1);
-  };
-
-  const handleRowsPerPageBlur = () => {
-    const normalizedValue = Number.parseInt(rowsPerPageInput, 10);
-    setRowsPerPageInput(String(Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : 10));
-  };
-
-  const filteredRecords = useMemo(() => {
+  const filteredAndSortedRecords = useMemo(() => {
+    let result = [];
     if (type === "requests") {
-      return records.filter(item => {
+      result = records.filter(item => {
+        const entryDate = toDateInputValue(item.date_filed);
+        
+        if (externalDateFilter) {
+          if (!entryDate || entryDate !== externalDateFilter) return false;
+        } else {
+          if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+          if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+        }
+
         const normalizedRequestType = String(item.request_type ?? "").trim().toLowerCase();
         const normalizedStatus = String(item.status ?? "").trim().toLowerCase();
 
@@ -200,311 +242,305 @@ export default function DataPanel({
           .toLowerCase();
         return !searchQuery || haystack.includes(searchQuery.toLowerCase());
       });
+    } else if (type === "attendance") {
+      result = records.filter(item => {
+        const record = item.raw ?? item;
+        const entryDate = toDateInputValue(record.time_in_at ?? record.time_out_at ?? record.updated_at ?? record.attendance_updated_at ?? record.attendance_date);
+        
+        if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+        if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+        if (externalDateFilter && externalDateFilter !== "" && (!entryDate || entryDate !== externalDateFilter)) return false;
+
+        const haystack = [
+          record.cluster_name,
+          record.attendance_tag,
+          record.tag,
+          record.attendance_note,
+          record.note,
+          record.employee_name,
+          record.employee_username,
+          record.username,
+          record.user_name,
+          personField ? record[personField] : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
+        return true;
+      });
     }
 
-    if (type !== "attendance") return [];
+    if (sortKey) {
+      result.sort((a, b) => {
+        const valA = getSortValue(a, sortKey);
+        const valB = getSortValue(b, sortKey);
+        const multiplier = sortDirection === "asc" ? 1 : -1;
 
-    return records.filter(item => {
-      const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at);
-      if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
-      if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
-      if (externalDateFilter && (!entryDate || entryDate !== externalDateFilter)) return false;
+        if (typeof valA === "number" && typeof valB === "number") {
+          return (valA - valB) * multiplier;
+        }
+        return String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: "base" }) * multiplier;
+      });
+    }
 
-      const haystack = [
-        item.cluster_name,
-        item.attendance_tag,
-        item.tag,
-        item.attendance_note,
-        item.note,
-        item.employee_username,
-        item.username,
-        personField ? item[personField] : "",
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    return result;
+  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter, sortKey, sortDirection, getSortValue]);
 
-      if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
-      return true;
-    });
-  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / rowsPerPage));
+  const rowsPerPage = parseInt(rowsPerPageInput) || 10;
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedRecords.length / rowsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (safeCurrentPage - 1) * rowsPerPage;
-  const paginatedRecords = filteredRecords.slice(pageStartIndex, pageStartIndex + rowsPerPage);
-  const visibleStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
-  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredRecords.length);
+  const paginatedRecords = filteredAndSortedRecords.slice(pageStartIndex, pageStartIndex + rowsPerPage);
 
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setDateStartFilter("");
+    setDateEndFilter("");
+    setRequestTypeFilter("all");
+    setRequestStatusFilter("all");
+    if (typeof onExternalDateFilterChange === "function") {
+      onExternalDateFilterChange("");
+    }
+    setCurrentPage(1);
+  };
 
+  const columns = useMemo(() => {
+    if (type === "attendance") {
+      return [
+        { label: "Date", key: "date", sortable: true },
+        { label: "Time In", key: "time_in", sortable: true },
+        { label: "Time Out", key: "time_out", sortable: true },
+        { label: "Total Hours", key: "total_hours", sortable: true },
+        { label: "Status", key: "status", sortable: true },
+        { label: "Cluster", key: "cluster", sortable: true },
+        { label: "Note", key: "note", sortable: false, expandable: true },
+        ...(personField ? [{ label: personLabel, key: "person", sortable: true }] : []),
+      ];
+    }
+    if (type === "requests") {
+      return [
+        { label: "Date Filed", key: "date_filed", sortable: true },
+        ...(personField ? [{ label: "Filed By", key: "person", sortable: true }] : []),
+        { label: "Request Type", key: "request_type", sortable: true },
+        { label: "Details", key: "details", sortable: false, expandable: true },
+        { label: "Schedule / Period", key: "schedule_period", sortable: false },
+        { label: "Status", key: "status", sortable: true },
+        ...(showRequestActionBy ? [
+          { label: "Endorsed By", key: "endorsed_by", sortable: true },
+          { label: "Approved By", key: "approved_by", sortable: true },
+        ] : []),
+      ];
+    }
+    return [];
+  }, [type, personField, personLabel]);
 
-  if (type === "attendance") {
-    const attendanceColumnCount = 7 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
-    const attendanceGridStyle = {
-      gridTemplateColumns: `repeat(${attendanceColumnCount}, minmax(140px, 1fr))`,
-      minWidth: `${attendanceColumnCount * 140}px`
-    };
+  const renderCell = useCallback((item, key) => {
+    const record = item.raw ?? item;
+    if (type === "attendance") {
+      const normalizedAttendance = normalizeAttendanceHistoryRecord(record);
+      const attendanceDateValue = record.time_in_at ?? record.time_out_at ?? record.updated_at ?? record.attendance_updated_at ?? record.attendance_date;
+      const statusText = record.attendance_tag ?? record.tag ?? record.status ?? "Pending";
 
-    return (
-      <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
-        <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history">
-          <label className="attendance-history-filter">
-            <span>From</span>
-            <input type="date" value={dateStartFilter} onChange={event => setDateStartFilter(event.target.value)} />
-          </label>
-          <label className="attendance-history-filter">
-            <span>To</span>
-            <input type="date" value={dateEndFilter} onChange={event => setDateEndFilter(event.target.value)} />
-          </label>
-          {typeof onExternalDateFilterChange === "function" && (
-            <label className="attendance-history-filter">
-              <span>Date</span>
-              <input type="date" value={externalDateFilter ?? ""} onChange={event => onExternalDateFilterChange(event.target.value)} />
-            </label>
-          )}
-          <label className="attendance-history-filter" style={{ minWidth: "260px" }}>
-            <span>Search</span>
-            <input type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }} />
-          </label>
-          <label className="attendance-history-filter attendance-history-rows-filter">
-            <span>Rows per page</span>
-            <input type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </label>
-        </div>
+      switch (key) {
+        case 'date': return formatAttendanceDate(attendanceDateValue);
+        case 'time_in': return formatAttendanceTime(record.time_in_at);
+        case 'time_out': return formatAttendanceTime(record.time_out_at);
+        case 'total_hours': return `${normalizedAttendance.total_hours}h`;
+        case 'status':
+          return (
+            <div className="am-status-cell">
+              <div className="am-status-dot" style={{ backgroundColor: getStatusColor(statusText) }} />
+              <span className="am-status-text">{statusText}</span>
+            </div>
+          );
+        case 'cluster': return record.cluster_name ?? "—";
+        case 'note': return record.attendance_note ?? record.note ?? "—";
+        case 'person':
+          return (
+            <div className="team-attendance-employee-cell">
+              <span>{getPersonPrimaryValue(item, personField)}</span>
+              {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+            </div>
+          );
+        default: return "—";
+      }
+    }
+    if (type === "requests") {
+      switch (key) {
+        case 'date_filed': return formatDateTime(record.date_filed);
+        case 'person':
+          return (
+            <div className="team-attendance-employee-cell">
+              <span>{getPersonPrimaryValue(item, personField)}</span>
+              {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+            </div>
+          );
+        case 'request_type': return record.request_type ?? "—";
+        case 'details': return normalizeRequestDetails(record.details);
+        case 'schedule_period': return record.schedule_period ?? "—";
+        case 'status': return record.status ?? "Pending";
+        case 'endorsed_by': return record.endorsed_by_name || "—";
+        case 'approved_by': return record.approved_by_name || "—";
+        default: return "—";
+      }
+    }
+    return "—";
+  }, [type, personField]);
 
-        <div className="employee-attendance-history-scroll">
-          <div className="employee-attendance-history-header" role="row" style={attendanceGridStyle}>
-            <span role="columnheader">Date</span>
-            <span role="columnheader">Time In</span>
-            <span role="columnheader">Time Out</span>
-            <span role="columnheader">Total Hours</span>
-            <span role="columnheader">Status</span>
-            <span role="columnheader">Cluster</span>
-            <span role="columnheader">Note</span>
-            {personField && <span role="columnheader">{personLabel}</span>}
-            {onEditRow && <span role="columnheader">Action</span>}
-          </div>
-          {filteredRecords.length > 0 ? paginatedRecords.map(item => {
-            const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
-            const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
-
-            return (
-              <div
-                key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.attendance_updated_at ?? item.time_in_at ?? "entry"}`}
-                className="employee-attendance-history-row"
-                role="row"
-                style={attendanceGridStyle}
-              >
-                <span role="cell">{formatAttendanceDate(attendanceDateValue)}</span>
-                <span role="cell">{formatAttendanceTime(item.time_in_at)}</span>
-                <span role="cell">{formatAttendanceTime(item.time_out_at)}</span>
-                <span role="cell" className="employee-attendance-total-hours-cell">{normalizedAttendance.total_hours}h</span>
-                <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
-                <span role="cell">{item.cluster_name ?? "—"}</span>
-                <span role="cell">{item.attendance_note ?? item.note ?? "—"}</span>
-                {personField && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, personField)}</span>
-                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-                  </span>
-                )}
-                {onEditRow && (
-                  <span role="cell">
-                    <button className="btn" type="button" onClick={() => onEditRow(item)}>Edit</button>
-                  </span>
-                )}
-              </div>
-            );
-          }) : (
-            <div className="empty-state">No attendance records match the selected filters.</div>
-          )}
-        </div>
-
-        <div className="employee-table-pagination employee-attendance-pagination">
-          <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredRecords.length}
-          </div>
-          <div className="employee-pagination-actions">
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
-              Previous
-            </button>
-            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (type === "requests") {
-    return (
-      <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
-        <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
-          {enableRequestFilters && (
-            <>
-              <label className="attendance-history-filter">
-                <span>Request Type</span>
-                <select value={requestTypeFilter} onChange={event => { setRequestTypeFilter(event.target.value); setCurrentPage(1); }}>
-                  {requestTypeOptions.map(option => (
-                    <option key={option} value={option}>
-                      {option === "all" ? "All request types" : option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="attendance-history-filter">
-                <span>Status</span>
-                <select value={requestStatusFilter} onChange={event => { setRequestStatusFilter(event.target.value); setCurrentPage(1); }}>
-                  {requestStatusOptions.map(option => (
-                    <option key={option} value={option}>
-                      {option === "all" ? "All statuses" : option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
-          <label className="attendance-history-filter" style={{ minWidth: "280px" }}>
-            <span>Search</span>
-            <input
-              type="text"
-              value={searchQuery}
-              placeholder={config.searchPlaceholder}
-              onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
-            />
-          </label>
-          <label className="attendance-history-filter attendance-history-rows-filter">
-            <span>Rows per page</span>
-            <input type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </label>
-        </div>
-
-        <div className="employee-attendance-history-scroll">
-          <div
-            className={`employee-attendance-history-header ${showRequestActionBy ? "employee-attendance-history-header-actor" : ""} ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
-            role="row"
+  const renderActions = useCallback((item) => {
+    if (type === "attendance") {
+      if (!onEditRow) return null;
+      return (
+        <button
+          className="am-action-btn primary"
+          type="button"
+          onClick={() => onEditRow(item)}
+        >
+          Edit
+        </button>
+      );
+    }
+    if (type === "requests") {
+      return (
+        <div className="am-table-actions-cell">
+          <button
+            className="am-action-btn primary"
+            type="button"
+            onClick={() => setSelectedRequest(item)}
           >
-            <span role="columnheader">Date Filed</span>
-            <span role="columnheader">Request Type</span>
-            <span role="columnheader">Details</span>
-            <span role="columnheader">Schedule / Period</span>
-            <span role="columnheader">Status</span>
-            {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
-            {showRequestActionBy && <span role="columnheader">Accepted / Rejected Date</span>}
-            {personField && <span role="columnheader">{personLabel}</span>}
-            {onRequestAction && <span role="columnheader">Actions</span>}
-          </div>
+            View
+          </button>
+          {onRequestAction && resolvedRequestActions.map(action => {
+            const currentStatus = String(item.status ?? "").toLowerCase();
+            const allowedStatuses = Array.isArray(action.allowedStatuses)
+              ? action.allowedStatuses.map(value => String(value).toLowerCase())
+              : ["pending"];
+            const canReview = item.can_review !== false;
+            const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
+            const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
 
-          {filteredRecords.length > 0 ? paginatedRecords.map(item => {
-            const photoUrl = resolveRequestPhotoUrl(item.photo_url ?? item.photo_path);
+            if (!isVisible) return null;
 
             return (
-              <div
-                key={item.id}
-                className={`employee-attendance-history-row ${showRequestActionBy ? "employee-attendance-history-row-actor" : ""} ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
-                role="row"
+              <button
+                key={`${item.id}-${action.status}`}
+                className={action.variant ?? "am-action-btn primary"}
+                type="button"
+                disabled={requestActionLoadingId === item.id || !isEnabled}
+                onClick={() => handleActionClick(item, action)}
               >
-                <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
-                <span role="cell">{item.request_type ?? "—"}</span>
-                <span role="cell">
-                  <div className="employee-request-details-cell">
-                    <span className="employee-request-details-text" title={normalizeRequestDetails(item.details)}>{truncateRequestDetails(item.details)}</span>
-                    <button
-                      className="btn secondary"
-                      type="button"
-                      onClick={() => setSelectedRequest(item)}
-                    >
-                      View
-                    </button>
-                  </div>
-                </span>
-                <span role="cell">{item.schedule_period ?? "—"}</span>
-                <span role="cell">
-                  <div className="employee-request-status-cell">
-                    <span>{item.status ?? "Pending"}</span>
-                    {photoUrl ? (
-                      <button
-                        className="btn secondary employee-request-photo-btn"
-                        type="button"
-                        onClick={() => setSelectedRequest(item)}
-                      >
-                        View Photo
-                      </button>
-                    ) : (
-                      <span className="employee-request-photo-empty">No photo</span>
-                    )}
-                  </div>
-                </span>
-                {showRequestActionBy && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, 'request_action_by_name')}</span>
-                    {item?.request_action_by_role ? <small>{item.request_action_by_role}</small> : null}
-                  </span>
-                )}
-                {showRequestActionBy && (
-                  <span role="cell">
-                    {formatRequestActionDate(item.request_action_at)}
-                  </span>
-                )}
-                {personField && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, personField)}</span>
-                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-                  </span>
-                )}
-                {onRequestAction && (
-                  <span role="cell" className="employee-request-actions-cell">
-                    <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
-                      {resolvedRequestActions.map(action => {
-                        const currentStatus = String(item.status ?? "").toLowerCase();
-                        const allowedStatuses = Array.isArray(action.allowedStatuses)
-                          ? action.allowedStatuses.map(value => String(value).toLowerCase())
-                          : ["pending"];
-                        const canReview = item.can_review !== false;
-                        const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
-                        const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
-
-                        if (!isVisible) {
-                          return null;
-                        }
-
-                        return (
-                          <button
-                            key={`${item.id}-${action.status}`}
-                            className={action.variant ?? "btn"}
-                            type="button"
-                            disabled={requestActionLoadingId === item.id || !isEnabled}
-                            onClick={() => onRequestAction(item, action.status)}
-                          >
-                            {requestActionLoadingId === item.id ? "Saving..." : action.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </span>
-                )}
-              </div>
+                {requestActionLoadingId === item.id ? "…" : action.label}
+              </button>
             );
-          }) : (
-            <div className="empty-state">No requests found.</div>
-          )}
+          })}
         </div>
+      );
+    }
+    return null;
+  }, [type, onEditRow, onRequestAction, resolvedRequestActions, requestActionLoadingId, handleActionClick]);
 
-        <div className="employee-table-pagination employee-attendance-pagination">
-          <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredRecords.length}
-          </div>
-          <div className="employee-pagination-actions">
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
-              Previous
-            </button>
-            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>
-              Next
-            </button>
-          </div>
-        </div>
+  const extraFilters = useMemo(() => {
+    if (type === "requests" && enableRequestFilters) {
+      return (
+        <>
+          <label className="am-filter-field">
+            <span className="am-filter-label">Type</span>
+            <select
+              style={{ padding: '6px', fontSize: '13px', borderRadius: '2px', border: '1px solid #d9d9d9', height: '36px' }}
+              value={requestTypeFilter}
+              onChange={e => { setRequestTypeFilter(e.target.value); setCurrentPage(1); }}
+            >
+              {requestTypeOptions.map(opt => <option key={opt} value={opt}>{opt === 'all' ? 'All Types' : opt}</option>)}
+            </select>
+          </label>
+          <label className="am-filter-field">
+            <span className="am-filter-label">Status</span>
+            <select
+              style={{ padding: '6px', fontSize: '13px', borderRadius: '2px', border: '1px solid #d9d9d9', height: '36px' }}
+              value={requestStatusFilter}
+              onChange={e => { setRequestStatusFilter(e.target.value); setCurrentPage(1); }}
+            >
+              {requestStatusOptions.map(opt => <option key={opt} value={opt}>{opt === 'all' ? 'All Status' : opt}</option>)}
+            </select>
+          </label>
+        </>
+      );
+    }
+    if (type === "attendance" && typeof onExternalDateFilterChange === "function") {
+       return (
+        <label className="am-filter-field">
+          <span className="am-filter-label">Single Date</span>
+          <input 
+            type="date" 
+            value={externalDateFilter ?? ""} 
+            onChange={e => { onExternalDateFilterChange(e.target.value); setCurrentPage(1); }} 
+          />
+        </label>
+       );
+    }
+    return null;
+  }, [type, enableRequestFilters, requestTypeFilter, requestTypeOptions, requestStatusFilter, requestStatusOptions, externalDateFilter, onExternalDateFilterChange]);
+
+  const gridTemplateColumns = useMemo(() => {
+    if (type === "attendance") {
+      // Columns: Date, Time In, Time Out, Total Hours, Status, Cluster, Note, [Person] + Actions
+      const dateCol = "minmax(150px, 1.2fr) ";
+      const timeCols = "minmax(110px, 1fr) minmax(110px, 1fr) ";
+      const hoursCol = "minmax(100px, 0.8fr) ";
+      const statusCol = "minmax(130px, 1fr) ";
+      const clusterCol = "minmax(140px, 1fr) ";
+      const noteCol = "minmax(200px, 1.5fr) ";
+      const personCol = personField ? "minmax(150px, 1fr) " : "";
+      const actionsCol = "minmax(100px, 0.8fr)";
+      return `${dateCol}${timeCols}${hoursCol}${statusCol}${clusterCol}${noteCol}${personCol}${actionsCol}`;
+    }
+    if (type === "requests") {
+      // Columns: Date Filed, [Filed By], Request Type, Details, Schedule/Period, Status, [Endorsed By], [Approved By] + Actions
+      const dateCol = "minmax(170px, 1.2fr) ";
+      const personCol = personField ? "minmax(140px, 1fr) " : "";
+      const typeCol = "minmax(160px, 1fr) ";
+      const detailsCol = "minmax(180px, 1.5fr) ";
+      const schedCol = "minmax(130px, 1fr) ";
+      const statusCol = "minmax(120px, 1fr) ";
+      const actorCols = showRequestActionBy ? "minmax(140px, 1fr) minmax(140px, 1fr) " : "";
+      const actionsCol = "minmax(180px, 1fr)";
+      return `${dateCol}${personCol}${typeCol}${detailsCol}${schedCol}${statusCol}${actorCols}${actionsCol}`;
+    }
+    return "";
+  }, [type, personField]);
+
+  if (!error) {
+    return (
+      <>
+        <UnifiedTable
+          title={type === "attendance" ? "All Attendance" : (onRequestAction ? "File Requests" : "My Requests")}
+          columns={columns}
+          data={paginatedRecords}
+          totalRecords={filteredAndSortedRecords.length}
+          loading={loading}
+          error={error}
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          rowsPerPage={rowsPerPageInput}
+          onRowsPerPageChange={val => { setRowsPerPageInput(val); setCurrentPage(1); }}
+          searchQuery={searchQuery}
+          onSearchChange={val => { setSearchQuery(val); setCurrentPage(1); }}
+          dateStart={dateStartFilter}
+          onDateStartChange={val => { setDateStartFilter(val); setCurrentPage(1); }}
+          dateEnd={dateEndFilter}
+          onDateEndChange={val => { setDateEndFilter(val); setCurrentPage(1); }}
+          onClearFilters={handleClearFilters}
+          extraFilters={extraFilters}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          renderCell={renderCell}
+          renderActions={renderActions}
+          gridTemplateColumns={gridTemplateColumns}
+        />
 
         {selectedRequest && (
           <div className="modal-overlay request-details-overlay" role="presentation" onClick={() => setSelectedRequest(null)}>
@@ -519,10 +555,17 @@ export default function DataPanel({
                 <div className="request-details-modal-heading">
                   <div id="request-details-modal-title" className="modal-title request-details-modal-title">Request Details</div>
                   <p className="modal-text request-details-modal-subtitle">
-                    {selectedRequest.request_type ?? "Request"} filed on {formatDateTimeLabel(selectedRequest.date_filed)}
+                    {selectedRequest.request_type ?? "Request"} filed on {formatDateTime(selectedRequest.date_filed)}
                   </p>
                 </div>
-                <button className="icon-btn request-details-close-btn" type="button" aria-label="Close request details" onClick={() => setSelectedRequest(null)}>✕</button>
+                <button
+                  className="icon-btn request-details-close-btn"
+                  type="button"
+                  aria-label="Close request details"
+                  onClick={() => setSelectedRequest(null)}
+                >
+                  ✕
+                </button>
               </div>
               <div className="request-details-modal-body">
                 <div className="request-details-content">
@@ -553,7 +596,7 @@ export default function DataPanel({
             </div>
           </div>
         )}
-      </div>
+      </>
     );
   }
 

@@ -183,25 +183,41 @@ if (hasTable($conn, 'employees') && hasColumn($conn, 'employees', 'user_id') && 
 $items = [];
 
 if (hasTable($conn, 'leave_requests')) {
+    $userDisplayColumnName = $userDisplayColumn ?? 'email';
+    $userSecondaryColumnName = $userSecondaryColumn ?? 'email';
+    $usersIdColumnName = $idColumn ?? 'user_id';
+
+    $ebFullNameExpr = hasColumn($conn, 'employees', 'first_name') && hasColumn($conn, 'employees', 'last_name')
+        ? "NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), '')"
+        : "''";
+    $abFullNameExpr = hasColumn($conn, 'employees', 'first_name') && hasColumn($conn, 'employees', 'last_name')
+        ? "NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), '')"
+        : "''";
+
     $stmt = $conn->prepare(
         "SELECT
-            leave_id AS source_id,
-            created_at AS filed_at,
-            leave_type AS request_type,
-            reason AS details,
-            " . ($leavePhotoColumn !== null ? $leavePhotoColumn : "NULL") . " AS photo_path,
-            CONCAT(COALESCE(start_date, ''), CASE WHEN end_date IS NOT NULL THEN CONCAT(' to ', end_date) ELSE '' END) AS schedule_period,
-            status,
-            reviewed_by,
-            approved_by
-         FROM leave_requests
-         WHERE employee_id = ?"
+            req.leave_id AS source_id,
+            req.created_at AS filed_at,
+            req.leave_type AS request_type,
+            req.reason AS details,
+            " . ($leavePhotoColumn !== null ? "req." . $leavePhotoColumn : "NULL") . " AS photo_path,
+            CONCAT(COALESCE(req.start_date, ''), CASE WHEN req.end_date IS NOT NULL THEN CONCAT(' to ', req.end_date) ELSE '' END) AS schedule_period,
+            req.status,
+            req.reviewed_by,
+            req.approved_by,
+            COALESCE($ebFullNameExpr, eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
+            COALESCE($abFullNameExpr, ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
+         FROM leave_requests req
+         LEFT JOIN users eb_u ON eb_u.$usersIdColumnName = req.reviewed_by
+         LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumnName
+         LEFT JOIN users ab_u ON ab_u.$usersIdColumnName = req.approved_by
+         LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumnName
+         WHERE req.employee_id = ?"
     );
     $stmt->bind_param('i', $employeeId);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
-        $actor = resolveRequestActor($conn, 'leave_requests', $row);
         $actionMeta = resolveRequestActionLog($conn, 'leave', $row);
         $items[] = [
             'id' => 'leave-' . $row['source_id'],
@@ -212,8 +228,8 @@ if (hasTable($conn, 'leave_requests')) {
             'photo_path' => trim((string)($row['photo_path'] ?? '')),
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending',
-            'request_action_by_name' => $actor['request_action_by_name'],
-            'request_action_by_role' => $actor['request_action_by_role'],
+            'endorsed_by_name' => $row['endorsed_by_name'],
+            'approved_by_name' => $row['approved_by_name'],
             'request_action_at' => $actionMeta['request_action_at'],
             'request_action_label' => $actionMeta['request_action_label']
         ];
@@ -221,23 +237,53 @@ if (hasTable($conn, 'leave_requests')) {
 }
 
 if (hasTable($conn, 'overtime_requests')) {
+    $userColumns = [];
+    $userColumnsResult = $conn->query("SHOW COLUMNS FROM users");
+    if ($userColumnsResult) {
+        while ($row = $userColumnsResult->fetch_assoc()) {
+            $userColumns[] = $row['Field'];
+        }
+    }
+    $idColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : 'user_id');
+    $userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : 'email');
+    $userSecondaryColumn = in_array('email', $userColumns, true) ? 'email' : 'email';
+
+    $userDisplayColumnName = $userDisplayColumn;
+    $userSecondaryColumnName = $userSecondaryColumn;
+    $usersIdColumnName = $idColumn;
+
+    $ebFullNameExpr = hasColumn($conn, 'employees', 'first_name') && hasColumn($conn, 'employees', 'last_name')
+        ? "NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), '')"
+        : "''";
+    $abFullNameExpr = hasColumn($conn, 'employees', 'first_name') && hasColumn($conn, 'employees', 'last_name')
+        ? "NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), '')"
+        : "''";
+
+    $hasReviewedBy = hasColumn($conn, 'overtime_requests', 'reviewed_by');
+    $reviewedByExpr = $hasReviewedBy ? 'req.reviewed_by' : 'NULL';
+
     $stmt = $conn->prepare(
         "SELECT
-            ot_id AS source_id,
-            created_at AS filed_at,
-            ot_type AS request_type,
-            purpose AS details,
-            CONCAT(COALESCE(start_time, ''), CASE WHEN end_time IS NOT NULL THEN CONCAT(' to ', end_time) ELSE '' END) AS schedule_period,
-            status,
-            approved_by
-         FROM overtime_requests
-         WHERE employee_id = ?"
+            req.ot_id AS source_id,
+            req.created_at AS filed_at,
+            req.ot_type AS request_type,
+            req.purpose AS details,
+            CONCAT(COALESCE(req.start_time, ''), CASE WHEN req.end_time IS NOT NULL THEN CONCAT(' to ', req.end_time) ELSE '' END) AS schedule_period,
+            req.status,
+            req.approved_by,
+            COALESCE($ebFullNameExpr, eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
+            COALESCE($abFullNameExpr, ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
+         FROM overtime_requests req
+         LEFT JOIN users eb_u ON eb_u.$usersIdColumnName = $reviewedByExpr
+         LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumnName
+         LEFT JOIN users ab_u ON ab_u.$usersIdColumnName = req.approved_by
+         LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumnName
+         WHERE req.employee_id = ?"
     );
     $stmt->bind_param('i', $employeeId);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
-        $actorName = resolveRequestActorName($conn, isset($row['approved_by']) ? (int)$row['approved_by'] : 0);
         $actionMeta = resolveRequestActionLog($conn, 'overtime', $row);
         $items[] = [
             'id' => 'ot-' . $row['source_id'],
@@ -245,11 +291,11 @@ if (hasTable($conn, 'overtime_requests')) {
             'date_filed' => $row['filed_at'],
             'request_type' => $row['request_type'] ?: 'Overtime',
             'details' => $row['details'] ?: '—',
-            'photo_path' => trim((string)($row['photo_path'] ?? '')),
+            'photo_path' => '',
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending',
-            'request_action_by_name' => $actorName,
-            'request_action_by_role' => '',
+            'endorsed_by_name' => $row['endorsed_by_name'],
+            'approved_by_name' => $row['approved_by_name'],
             'request_action_at' => $actionMeta['request_action_at'],
             'request_action_label' => $actionMeta['request_action_label']
         ];
@@ -257,16 +303,49 @@ if (hasTable($conn, 'overtime_requests')) {
 }
 
 if (hasTable($conn, 'attendance_disputes')) {
+    $userColumns = [];
+    $userColumnsResult = $conn->query("SHOW COLUMNS FROM users");
+    if ($userColumnsResult) {
+        while ($row = $userColumnsResult->fetch_assoc()) {
+            $userColumns[] = $row['Field'];
+        }
+    }
+    $idColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : 'user_id');
+    $userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : 'email');
+    $userSecondaryColumn = in_array('email', $userColumns, true) ? 'email' : 'email';
+
+    $userDisplayColumnName = $userDisplayColumn;
+    $userSecondaryColumnName = $userSecondaryColumn;
+    $usersIdColumnName = $idColumn;
+
+    $ebFullNameExpr = hasColumn($conn, 'employees', 'first_name') && hasColumn($conn, 'employees', 'last_name')
+        ? "NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), '')"
+        : "''";
+    $abFullNameExpr = hasColumn($conn, 'employees', 'first_name') && hasColumn($conn, 'employees', 'last_name')
+        ? "NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), '')"
+        : "''";
+
+    $hasReviewedBy = hasColumn($conn, 'attendance_disputes', 'reviewed_by');
+    $hasApprovedBy = hasColumn($conn, 'attendance_disputes', 'approved_by');
+    $reviewedByExpr = $hasReviewedBy ? 'req.reviewed_by' : 'NULL';
+    $approvedByExpr = $hasApprovedBy ? 'req.approved_by' : 'NULL';
+
     $stmt = $conn->prepare(
         "SELECT
-            dispute_id AS source_id,
-            created_at AS filed_at,
-            dispute_type AS request_type,
-            reason AS details,
-            dispute_date AS schedule_period,
-            status
-         FROM attendance_disputes
-         WHERE employee_id = ?"
+            req.dispute_id AS source_id,
+            req.created_at AS filed_at,
+            req.dispute_type AS request_type,
+            req.reason AS details,
+            req.dispute_date AS schedule_period,
+            req.status,
+            COALESCE($ebFullNameExpr, eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
+            COALESCE($abFullNameExpr, ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
+         FROM attendance_disputes req
+         LEFT JOIN users eb_u ON eb_u.$usersIdColumnName = $reviewedByExpr
+         LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumnName
+         LEFT JOIN users ab_u ON ab_u.$usersIdColumnName = $approvedByExpr
+         LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumnName
+         WHERE req.employee_id = ?"
     );
     $stmt->bind_param('i', $employeeId);
     $stmt->execute();
@@ -281,8 +360,8 @@ if (hasTable($conn, 'attendance_disputes')) {
             'details' => $row['details'] ?: '—',
             'schedule_period' => $row['schedule_period'] ?: '—',
             'status' => $row['status'] ?: 'Pending',
-            'request_action_by_name' => '',
-            'request_action_by_role' => '',
+            'endorsed_by_name' => $row['endorsed_by_name'],
+            'approved_by_name' => $row['approved_by_name'],
             'request_action_at' => $actionMeta['request_action_at'],
             'request_action_label' => $actionMeta['request_action_label']
         ];

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { apiFetch } from "../api/api";
-import { useFeedback } from "./FeedbackProvider";
+import { useFeedback } from "./FeedbackContext";
 import usePermissions from "../hooks/usePermissions";
 
 const initialEmployeeForm = {
@@ -794,7 +795,13 @@ export default function EmployeesSection() {
                   >
                     <span>{column.label}</span>
                     <span className="employee-sort-indicator" aria-hidden="true">
-                      {employeeSortKey === column.key ? (employeeSortDirection === "asc" ? "^" : "v") : "-"}
+                      {employeeSortKey !== column.key ? (
+                        <ArrowUpDown size={14} />
+                      ) : employeeSortDirection === "asc" ? (
+                        <ChevronUp size={14} />
+                      ) : (
+                        <ChevronDown size={14} />
+                      )}
                     </span>
                   </button>
                 ) : (

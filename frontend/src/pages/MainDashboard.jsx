@@ -161,12 +161,13 @@ function ShiftCard({ schedule = null, dashboardMeta = null }) {
 
 function CalendarCard({ calendarData, onPrevMonth, onNextMonth }) {
   return (
-    <div className="card calendar-card">
+    <div className="card calendar-card" role="region" aria-label="Calendar">
       <div className="card-top">
         <button 
           type="button"
           className="calendar-nav-btn" 
           onClick={onPrevMonth}
+          aria-label="Previous month"
           title="Previous month"
         >
           ◀
@@ -176,15 +177,16 @@ function CalendarCard({ calendarData, onPrevMonth, onNextMonth }) {
           type="button"
           className="calendar-nav-btn" 
           onClick={onNextMonth}
+          aria-label="Next month"
           title="Next month"
         >
           ▶
         </button>
       </div>
-      <div className="calendar-month-label">{calendarData.monthLabel}</div>
-      <div className="calendar-grid weekdays">
+      <div className="calendar-month-label" aria-live="polite">{calendarData.monthLabel}</div>
+      <div className="calendar-grid weekdays" role="row">
         {calendarData.weekDays.map(weekday => (
-          <div key={weekday} className="calendar-cell header">{weekday}</div>
+          <div key={weekday} className="calendar-cell header" role="columnheader">{weekday}</div>
         ))}
       </div>
       <div className="calendar-grid dates">
@@ -192,6 +194,7 @@ function CalendarCard({ calendarData, onPrevMonth, onNextMonth }) {
           <div
             key={`${cell.day}-${index}`}
             className={`calendar-cell ${cell.muted ? "muted" : ""} ${cell.isToday ? "today" : ""}`}
+            aria-current={cell.isToday ? "date" : undefined}
           >
             {cell.day}
           </div>
@@ -566,27 +569,31 @@ export default function MainDashboard({
           >
             <h3 id="announcement-modal-title">Create Announcement</h3>
             <form onSubmit={handleCreateAnnouncement} className="announcement-form">
-              <label className="announcement-form-field">
-                <span>Title</span>
+              <div className="announcement-form-field">
+                <label htmlFor="ann-title">Title</label>
                 <input
+                  id="ann-title"
                   type="text"
                   value={announcementTitle}
                   onChange={event => setAnnouncementTitle(event.target.value)}
                   maxLength={100}
                   disabled={isSavingAnnouncement}
+                  required
                 />
-              </label>
-              <label className="announcement-form-field">
-                <span>Content</span>
+              </div>
+              <div className="announcement-form-field">
+                <label htmlFor="ann-content">Content</label>
                 <textarea
+                  id="ann-content"
                   value={announcementContent}
                   onChange={event => setAnnouncementContent(event.target.value)}
                   rows={5}
                   disabled={isSavingAnnouncement}
+                  required
                 />
-              </label>
+              </div>
               {announcementFormError ? (
-                <p className="announcement-form-error">{announcementFormError}</p>
+                <p className="announcement-form-error" role="alert">{announcementFormError}</p>
               ) : null}
               <div className="time-out-modal-actions">
                 <button

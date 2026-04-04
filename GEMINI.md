@@ -78,7 +78,32 @@ This file serves as the foundational context for interaction with the **Team Clu
 
 ---
 
+## 🛠 Source Control & Workflow
+
+### 1. Commit Message Convention
+All commits must follow the standard convention:
+- **Format:** `<type>: <description>`
+- **Types:** `feat`, `fix`, `chore`, `doc`, `perf`, `refactor`.
+- **Mood:** Always use the **imperative mood** (e.g., `fix: update logic` NOT `fixed: updated logic`).
+
+### 2. Branching Strategy
+- **New Features:** Create a branch prefixed with `feat/` (e.g., `git checkout -b feat/new-api-endpoint`).
+- **Refactoring:** Create a branch prefixed with `refactor/`.
+- **Bug Fixes:** Use `fix/`.
+
+---
+
+## ⚡ Efficiency Mandates
+
+- **Turn Limit:** If a task requires more than 5 consecutive tool calls or high-volume data processing that may exceed a few minutes, the agent MUST stop and provide a progress report to the user.
+- **Background Tasks:** For any command that might take significant time (e.g., complex builds), the agent must explicitly ask to run it with `is_background: true`.
+- **Parallelization:** Always execute independent search or read operations in parallel to minimize latency.
+
+---
+
 ## 📖 Key Documentation
+- **UI/UX Technical Standards:** `docs/design/STANDARDS.md`
+- **Architectural Reference:** `docs/ARCHITECTURAL_REFERENCE.md`
 - **Backend API Guide:** `docs/BACKEND_API_GUIDE.md`
 - **Frontend Guide:** `docs/FRONTEND_GUIDE.md`
 - **QA & Testing:** `docs/qa/ATTENDANCE_TEST_CASES.md`

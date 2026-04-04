@@ -1,6 +1,6 @@
 import "../styles/DashboardLayout.css";
 import "../styles/EmployeeDashboard.css";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/ResponsiveDashboardSidebar";
@@ -12,17 +12,19 @@ import DataPanel from "../components/DataPanel";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
 import ProfileSection from "../components/ProfileSection";
-import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
-import useLiveDateTime from "../hooks/useLiveDateTime";
+import { fetchMyRequests } from "../api/requests";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
+import { HIGHLIGHT_IDS, buildRequestHighlights } from "../utils/highlightUtils";
+import { useFeedback } from "../components/FeedbackContext";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
-  const { hasPermission } = usePermissions();
+  const { showToast } = useFeedback();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,
@@ -42,11 +44,12 @@ export default function EmployeeDashboard() {
     ...(canAccessEmployeesTab ? ["Employees"] : []),
     ...(canAccessControlPanel ? ["Control Panel"] : [])
   ];
-  const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
+  const attendanceNavItems = useMemo(() => ["My Attendance", "My Requests", "My Filing Center"], []);
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
+  const [filingCenterInitialDate, setFilingCenterInitialDate] = useState("");
   const isAttendanceView = attendanceNavItems.includes(activeNav);
   const sidebarNavItems = navItems.map(item => {
     if (item === "Attendance") {
@@ -76,11 +79,31 @@ export default function EmployeeDashboard() {
   });
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
+  const [myRequestsFilter, setMyRequestsFilter] = useState(null);
+
+  const filteredMyRequests = useMemo(() => {
+    if (!myRequestsFilter || myRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return myRequests;
+    return myRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (myRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (myRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (myRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [myRequests, myRequestsFilter]);
+
   const activeCluster = data[0];
-  const dateTimeLabel = useLiveDateTime();
+
+  const handleHighlightFilterChange = (setter) => (id) => {
+    setter(current => current === id ? null : id);
+  };
 
 
   useEffect(() => {
+    if (permissionsLoading) {
+      return;
+    }
+
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
       || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
@@ -120,7 +143,7 @@ export default function EmployeeDashboard() {
     }
 
     setActiveNav("Profile");
-  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam, permissionsLoading]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -302,7 +325,7 @@ export default function EmployeeDashboard() {
     );
   };
 
-  const persistAttendance = async nextAttendance => {
+  const persistAttendance = async (nextAttendance, actionType) => {
     if (!activeCluster?.cluster_id) {
       setAttendanceLog(nextAttendance);
       return nextAttendance;
@@ -317,7 +340,19 @@ export default function EmployeeDashboard() {
       });
 
       setAttendanceLog(savedAttendance);
+      showToast({
+        title: actionType === "in" ? "Clock-In Successful" : "Clock-Out Successful",
+        message: `You have successfully clocked ${actionType === "in" ? "in" : "out"} for today.`,
+        type: "success"
+      });
       return savedAttendance;
+    } catch (error) {
+      showToast({
+        title: actionType === "in" ? "Clock-In Failed" : "Clock-Out Failed",
+        message: error?.error ?? error?.message ?? `Unable to process clock-${actionType}.`,
+        type: "error"
+      });
+      throw error;
     } finally {
       setIsSavingAttendance(false);
     }
@@ -347,7 +382,7 @@ export default function EmployeeDashboard() {
       timeInAt: now,
       timeOutAt: null,
       tag
-    });
+    }, "in");
   };
 
   const handleTimeOut = async () => {
@@ -358,7 +393,7 @@ export default function EmployeeDashboard() {
       ...attendanceLog,
       timeOutAt: new Date()
     };
-    await persistAttendance(nextAttendance);
+    await persistAttendance(nextAttendance, "out");
   };
 
   const getStatusTag = (statusLabel, isScheduledToday) => {
@@ -448,7 +483,7 @@ export default function EmployeeDashboard() {
   }, [canViewAttendance, canViewTeam]);
 
 
-  const myRequestHighlights = buildRequestHighlights(myRequests);
+  const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
 
   // const handleLogout = async () => {
   //   try {
@@ -510,7 +545,11 @@ export default function EmployeeDashboard() {
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
                   <div className="employee-card-body employee-card-body-flush">
-                    <AttendanceModule onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
+                    <AttendanceModule onDisputeClick={record => {
+                      setFilingCenterInitialTab("dispute");
+                      setFilingCenterInitialDate(record.date);
+                      setActiveNav("My Filing Center");
+                    }} />
                   </div>
                 </div>
               )}
@@ -521,14 +560,22 @@ export default function EmployeeDashboard() {
                     <div className="employee-card-title">My Requests</div>
                   </div>
                   <div className="employee-card-body">
-                    <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                    <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
+                    <AttendanceHistoryHighlights 
+                      highlights={myRequestHighlights} 
+                      activeFilter={myRequestsFilter}
+                      onFilterChange={handleHighlightFilterChange(setMyRequestsFilter)}
+                    />
+                    <DataPanel type="requests" records={filteredMyRequests} enableRequestFilters showRequestActionBy />
                   </div>
                 </div>
               )}
 
               {activeNav === "My Filing Center" && (
-                <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+                <FilingCenterPanel
+                  initialTab={filingCenterInitialTab}
+                  initialDate={filingCenterInitialDate}
+                  onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))}
+                />
               )}
 
               {activeNav === "Employees" && (

@@ -1,34 +1,35 @@
-import React, { useMemo, useState } from 'react';
-import { Search, Calendar, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
+import React from 'react';
+import { Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
 import { normalizeAttendanceHistoryRecords } from '../api/attendance';
+import { formatFullDate } from '../utils/dateUtils';
+import AttendanceHistoryHighlights from './AttendanceHistoryHighlights';
+import { buildAttendanceHighlights, HIGHLIGHT_IDS } from '../utils/highlightUtils';
+import UnifiedTable from './shared/UnifiedTable';
+import { useFeedback } from './FeedbackContext';
 import '../styles/AttendanceModule.css';
-
-const StatCard = ({ title, value, delta, icon, colorClass, isOffline }) => {
-  const IconComponent = icon;
-  return (
-    <div className="am-stat-card">
-      <div className="am-stat-header">
-        <span className="am-stat-title">{title}</span>
-        <div className="am-stat-icon-wrapper" style={{ backgroundColor: colorClass }}>
-          <IconComponent />
-        </div>
-      </div>
-      <div className="am-stat-value" style={{ color: isOffline ? '#cbd5e1' : undefined }}>
-        {isOffline ? "--" : value}
-      </div>
-      <div className="am-stat-delta">{isOffline ? "N/A" : delta}</div>
-    </div>
-  );
-};
 
 const getStatusColor = (status) => {
   const s = String(status).toLowerCase();
-  if (['present', 'approved'].includes(s)) return '#52c41a';
+  if (['present', 'approved', 'on time'].includes(s)) return '#52c41a';
   if (['absent', 'denied'].includes(s)) return '#f5222d';
   if (s === 'late') return '#faad14';
   if (s === 'pending') return '#1890ff';
   return '#cbd5e1';
+};
+
+const toDateInputValue = value => {
+  if (!value) return null;
+  const str = String(value).trim();
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const parsed = new Date(str.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 export default function AttendanceModule({
@@ -37,185 +38,200 @@ export default function AttendanceModule({
   error: errorProp = null,
   onDisputeClick = null,
 }) {
+  const { showToast } = useFeedback();
   const historyState = useAttendanceHistory();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [rowsPerPageInput, setRowsPerPageInput] = useState('10');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [dateStartFilter, setDateStartFilter] = React.useState("");
+  const [dateEndFilter, setDateEndFilter] = React.useState("");
+  const [rowsPerPageInput, setRowsPerPageInput] = React.useState('10');
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [sortKey, setSortKey] = React.useState("Date");
+  const [sortDirection, setSortDirection] = React.useState("desc");
+  const [activeHighlightFilter, setActiveHighlightFilter] = React.useState(null);
+
   const isControlled = Array.isArray(records);
   const rawData = isControlled ? records : historyState.data;
-  const data = useMemo(() => normalizeAttendanceHistoryRecords(rawData), [rawData]);
+  const data = React.useMemo(() => normalizeAttendanceHistoryRecords(rawData), [rawData]);
   const loading = isControlled ? loadingProp : historyState.loading;
   const error = isControlled ? errorProp : historyState.error;
 
-  const stats = useMemo(() => {
-    if (!data.length) return { hours: '0.00', present: 0, late: 0, ot: '0.00' };
-    
-    const totalHrs = data.reduce((acc, curr) => acc + parseFloat(curr.total_hours || 0), 0);
-    const presentCount = data.filter(r => ['present', 'approved'].includes(r.status.toLowerCase())).length;
-    const lateCount = data.filter(r => r.status.toLowerCase() === 'late').length;
-    
-    return {
-      hours: totalHrs.toFixed(2),
-      present: presentCount,
-      late: lateCount,
-      ot: '0.00' 
-    };
-  }, [data]);
+  const highlights = React.useMemo(() => buildAttendanceHighlights(data), [data]);
 
-  const filteredData = useMemo(() => {
-    if (!searchQuery) return data;
-    return data.filter(r => 
-      r.date?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      r.status?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [data, searchQuery]);
+  React.useEffect(() => {
+    if (error) {
+      showToast({
+        title: "Attendance Error",
+        message: error,
+        type: "error"
+      });
+    }
+  }, [error, showToast]);
+
+  const handleSort = key => {
+    if (sortKey === key) {
+      setSortDirection(current => (current === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("desc");
+    }
+  };
+
+  const handleHighlightFilterChange = (id) => {
+    setActiveHighlightFilter(current => current === id ? null : id);
+    setCurrentPage(1);
+  };
+
+  const filteredAndSortedData = React.useMemo(() => {
+    let result = data.filter(item => {
+      // 1. Highlight Filtering
+      if (activeHighlightFilter && activeHighlightFilter !== HIGHLIGHT_IDS.TOTAL_HOURS && activeHighlightFilter !== HIGHLIGHT_IDS.DAYS_PRESENT) {
+        const status = String(item.status || "").toLowerCase();
+        if (activeHighlightFilter === HIGHLIGHT_IDS.TOTAL_LATE && status !== "late") return false;
+        if (activeHighlightFilter === HIGHLIGHT_IDS.OVERTIME && !(status.includes("overtime") || status.includes("over time"))) return false;
+      }
+
+      // 2. Date Range Filtering
+      const entryDate = toDateInputValue(item.date);
+      if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+      if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+
+      // 3. Search Query Filtering
+      const haystack = [
+        item.date,
+        item.time_in,
+        item.time_out,
+        item.total_hours,
+        item.status,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return !searchQuery || haystack.includes(searchQuery.toLowerCase());
+    });
+
+    if (sortKey) {
+      result.sort((a, b) => {
+        let valA, valB;
+        if (sortKey === "Date") {
+          valA = new Date(a.date).getTime();
+          valB = new Date(b.date).getTime();
+        } else if (sortKey === "Total Hours") {
+          valA = parseFloat(a.total_hours || 0);
+          valB = parseFloat(b.total_hours || 0);
+        } else {
+          valA = String(a[sortKey.toLowerCase().replace(/ /g, "_")] || "").toLowerCase();
+          valB = String(b[sortKey.toLowerCase().replace(/ /g, "_")] || "").toLowerCase();
+        }
+
+        const multiplier = sortDirection === "asc" ? 1 : -1;
+        if (typeof valA === "number" && typeof valB === "number") {
+          return (valA - valB) * multiplier;
+        }
+        return String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: "base" }) * multiplier;
+      });
+    }
+
+    return result;
+  }, [data, searchQuery, dateStartFilter, dateEndFilter, sortKey, sortDirection, activeHighlightFilter]);
 
   const parsedRowsPerPage = Number.parseInt(rowsPerPageInput, 10);
   const rowsPerPage = Number.isFinite(parsedRowsPerPage) && parsedRowsPerPage > 0 ? parsedRowsPerPage : 10;
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / rowsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (safeCurrentPage - 1) * rowsPerPage;
-  const paginatedData = filteredData.slice(pageStartIndex, pageStartIndex + rowsPerPage);
-  const visibleStart = filteredData.length === 0 ? 0 : pageStartIndex + 1;
-  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredData.length);
+  const paginatedData = filteredAndSortedData.slice(pageStartIndex, pageStartIndex + rowsPerPage);
 
-  const handleRowsPerPageChange = event => {
-    const nextValue = event.target.value.replace(/[^0-9]/g, '');
+  const handleRowsPerPageChange = value => {
+    const nextValue = value.replace(/[^0-9]/g, '');
     setRowsPerPageInput(nextValue);
     setCurrentPage(1);
   };
 
-  const handleRowsPerPageBlur = () => {
-    const normalizedValue = Number.parseInt(rowsPerPageInput, 10);
-    setRowsPerPageInput(String(Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : 10));
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setDateStartFilter("");
+    setDateEndFilter("");
+    setActiveHighlightFilter(null);
+    setCurrentPage(1);
   };
 
+  const columns = [
+    { label: "Date", key: "date", sortable: true },
+    { label: "Time In", key: "time_in", sortable: true },
+    { label: "Time Out", key: "time_out", sortable: true },
+    { label: "Total Hours", key: "total_hours", sortKey: "Total Hours", sortable: true },
+    { label: "Status", key: "status", sortable: true },
+  ];
 
-  if (loading) {
-    return (
-      <div className="am-loading">
-        <Loader2 size={40} />
-        <p style={{ color: '#64748b', fontWeight: 500 }}>Syncing records...</p>
-      </div>
-    );
-  }
+  const renderCell = (record, key) => {
+    switch (key) {
+      case 'date':
+        return <span className="am-td-date">{formatFullDate(record.date)}</span>;
+      case 'time_in':
+      case 'time_out':
+        return <span className="am-td-time">{record[key]}</span>;
+      case 'total_hours':
+        return <span className="am-td-total">{record.total_hours}h</span>;
+      case 'status':
+        return (
+          <div className="am-status-cell">
+            <div className="am-status-dot" style={{ backgroundColor: getStatusColor(record.status) }} />
+            <span className="am-status-text">{record.status}</span>
+          </div>
+        );
+      default:
+        return record[key];
+    }
+  };
+
+  const renderActions = (record) => (
+    <button
+      className="am-action-btn primary"
+      onClick={() => onDisputeClick?.(record)}
+    >
+      Dispute
+    </button>
+  );
 
   return (
     <div className="am-container">
-      {error && (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-           <div className="am-offline-banner">Offline: {error}</div>
-        </div>
-      )}
+      <AttendanceHistoryHighlights
+        highlights={highlights}
+        activeFilter={activeHighlightFilter}
+        onFilterChange={handleHighlightFilterChange}
+      />
 
-      <div className="am-stats-grid">
-        <StatCard title="Total Hours" value={stats.hours} delta="Calculated from logs" icon={Clock} colorClass="#64748b" isOffline={!!error} />
-        <StatCard title="Days Present" value={stats.present} delta="Count of active shifts" icon={CheckCircle2} colorClass="#52c41a" isOffline={!!error} />
-        <StatCard title="Total Late" value={stats.late} delta="Requires attention" icon={AlertCircle} colorClass="#faad14" isOffline={!!error} />
-        <StatCard title="Overtime" value={stats.ot} delta="Pending approval" icon={ArrowUpRight} colorClass="#1890ff" isOffline={!!error} />
-      </div>
-
-      <div className="am-content-panel">
-        <div className="am-toolbar">
-          <h2 className="am-toolbar-title">My Attendance Logs</h2>
-          <div className="am-toolbar-actions">
-            <button className="am-btn-outline" disabled={!!error}>
-              <Calendar size={16} />
-              <span>Filter Dates</span>
-            </button>
-            <div className="am-search-container">
-              <input 
-                type="text"
-                disabled={!!error}
-                placeholder="Search logs..."
-                className="am-search-input"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              />
-              <Search className="am-search-icon" />
-            </div>
-            <label className="am-rows-field" htmlFor="attendance-rows-per-page">
-              <span className="am-rows-label">Rows per page</span>
-              <input
-                id="attendance-rows-per-page"
-                type="text"
-                inputMode="numeric"
-                disabled={!!error}
-                placeholder="10"
-                className="am-rows-input"
-                value={rowsPerPageInput}
-                onChange={handleRowsPerPageChange}
-                onBlur={handleRowsPerPageBlur}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="am-table-wrapper">
-          <table className="am-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Time In</th>
-                <th>Time Out</th>
-                <th>Total Hours</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {error ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '60px' }}>
-                    <ListTodo size={48} color="#cbd5e1" style={{ marginBottom: '16px' }} />
-                    <p style={{ color: '#475569', fontWeight: 'bold' }}>Server Connection Lost</p>
-                  </td>
-                </tr>
-              ) : filteredData.length === 0 ? (
-                <tr><td colSpan={6} className="am-empty">No records found.</td></tr>
-              ) : paginatedData.map((record, i) => (
-                <tr key={i}>
-                  <td className="am-td-date">{record.date}</td>
-                  <td className="am-td-time">{record.time_in}</td>
-                  <td className="am-td-time">{record.time_out}</td>
-                  <td className="am-td-total">{record.total_hours}h</td>
-                  <td>
-                    <div className="am-status-cell">
-                      <div className="am-status-dot" style={{ backgroundColor: getStatusColor(record.status) }} />
-                      <span className="am-status-text">{record.status}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="am-actions-hover">
-                      <button
-                        className="am-action-btn primary"
-                        onClick={() => onDisputeClick?.(record)}
-                      >
-                        Dispute
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="employee-table-pagination am-table-pagination">
-          <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredData.length}
-          </div>
-          <div className="employee-pagination-actions">
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1 || !!error}>
-              Previous
-            </button>
-            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages || !!error}>
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
+      <UnifiedTable
+        title="My Attendance Logs"
+        columns={columns}
+        data={paginatedData}
+        totalRecords={filteredAndSortedData.length}
+        loading={loading}
+        error={error}
+        // Pagination
+        currentPage={safeCurrentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        rowsPerPage={rowsPerPageInput}
+        onRowsPerPageChange={handleRowsPerPageChange}
+        // Filtering
+        searchQuery={searchQuery}
+        onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+        dateStart={dateStartFilter}
+        onDateStartChange={(val) => { setDateStartFilter(val); setCurrentPage(1); }}
+        dateEnd={dateEndFilter}
+        onDateEndChange={(val) => { setDateEndFilter(val); setCurrentPage(1); }}
+        onClearFilters={handleClearFilters}
+        // Sorting
+        sortKey={sortKey}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+        // Rendering
+        renderCell={renderCell}
+        renderActions={renderActions}
+        gridTemplateColumns="minmax(180px, 1.2fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(120px, 0.8fr) minmax(150px, 1fr) minmax(120px, 0.8fr)"
+      />
     </div>
   );
 }

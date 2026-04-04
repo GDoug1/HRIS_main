@@ -67,9 +67,9 @@ const toTotalHours = (timeInAt, timeOutAt, fallbackValue = null) => {
 };
 
 export const normalizeAttendanceHistoryRecord = record => {
-  const timeInAt = record?.time_in_at ?? null;
-  const timeOutAt = record?.time_out_at ?? null;
-  const sourceDate = record?.date ?? timeInAt ?? timeOutAt ?? record?.updated_at ?? null;
+  const timeInAt = record?.time_in_at ?? record?.raw?.time_in_at ?? null;
+  const timeOutAt = record?.time_out_at ?? record?.raw?.time_out_at ?? null;
+  const sourceDate = record?.date ?? record?.raw?.date ?? timeInAt ?? timeOutAt ?? record?.updated_at ?? null;
   const status = record?.status ?? record?.attendance_tag ?? record?.tag ?? "pending";
 
   return {
@@ -78,9 +78,9 @@ export const normalizeAttendanceHistoryRecord = record => {
     time_out: record?.time_out ?? toDisplayTime(timeOutAt),
     break_in: record?.break_in ?? "--",
     break_out: record?.break_out ?? "--",
-    total_hours: toTotalHours(timeInAt, timeOutAt, record?.total_hours ?? null),
+    total_hours: toTotalHours(timeInAt, timeOutAt, record?.total_hours ?? record?.raw?.total_hours ?? null),
     status: String(status).toLowerCase(),
-    raw: record,
+    raw: record?.raw ?? record,
   };
 };
 
@@ -93,6 +93,23 @@ export const saveDashboardAttendance = async ({ clusterId, nextAttendance }) => 
     method: "POST",
     body: JSON.stringify({
       cluster_id: clusterId,
+      ...nextAttendance,
+      timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
+      timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null,
+    })
+  });
+
+  return {
+    timeInAt: parseSqlDateTime(response?.attendance?.timeInAt ?? null),
+    timeOutAt: parseSqlDateTime(response?.attendance?.timeOutAt ?? null),
+    tag: response?.attendance?.tag ?? null,
+  };
+};
+
+export const saveAdminDashboardAttendance = async ({ nextAttendance }) => {
+  const response = await apiFetch("api/admin/save_attendance.php", {
+    method: "POST",
+    body: JSON.stringify({
       ...nextAttendance,
       timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
       timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null,

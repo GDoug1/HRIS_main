@@ -15,3 +15,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     http_response_code(204);
     exit();
 }
+
+if (session_status() === PHP_SESSION_NONE) {
+    if ($origin !== '' && !str_contains($origin, 'localhost')) {
+        session_set_cookie_params([
+            'samesite' => 'None',
+            'secure' => true,
+            'httponly' => true
+        ]);
+    }
+    session_start();
+}

@@ -2,7 +2,6 @@
 include "../cors.php";
 
 include "../config/database.php";
-session_start();
 
 function normalizeRole(?string $roleName): string {
     $role = strtolower(trim((string)$roleName));

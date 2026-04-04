@@ -14,53 +14,16 @@ import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
 import ProfileSection from "../components/ProfileSection";
-import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
+import { fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 import { logout } from "../utils/logout";
-import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
+import { normalizeAttendanceHistoryRecords, parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
-import { useFeedback } from "../components/FeedbackProvider";
+import { useFeedback } from "../components/FeedbackContext";
+import { buildAttendanceHighlights, buildRequestHighlights, HIGHLIGHT_IDS } from "../utils/highlightUtils";
 
 const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
 
-const parseAttendanceDate = value => {
-  if (!value) return null;
-  const parsed = new Date(String(value).replace(" ", "T"));
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const buildAllAttendanceHighlights = records => {
-  const totals = (Array.isArray(records) ? records : []).reduce((acc, row) => {
-    const timeIn = parseAttendanceDate(row?.time_in_at);
-    const timeOut = parseAttendanceDate(row?.time_out_at);
-    const status = String(row?.attendance_tag ?? row?.tag ?? "").toLowerCase();
-
-    if (timeIn && timeOut && timeOut >= timeIn) {
-      acc.totalHours += (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
-    }
-
-    if (timeIn) {
-      acc.daysPresent.add(`${row?.user_id ?? row?.employee_id ?? "unknown"}-${timeIn.toISOString().slice(0, 10)}`);
-    }
-
-    if (status.includes("late")) acc.totalLate += 1;
-    if (status.includes("overtime") || status.includes("over time")) acc.overtime += 1;
-    return acc;
-  }, {
-    totalHours: 0,
-    daysPresent: new Set(),
-    totalLate: 0,
-    overtime: 0
-  });
-
-  return [
-    { key: "totalHours", label: "Total Hours", icon: "◷", accentClass: "is-slate", value: totals.totalHours.toFixed(2), subValue: "Calculated from logs" },
-    { key: "daysPresent", label: "Days Present", icon: "◉", accentClass: "is-green", value: totals.daysPresent.size, subValue: "Logged attendance days" },
-    { key: "totalLate", label: "Total Late", icon: "!", accentClass: "is-amber", value: totals.totalLate, subValue: "Requires attention" },
-    { key: "overtime", label: "Overtime", icon: "↗", accentClass: "is-blue", value: totals.overtime.toFixed(2), subValue: "Tagged overtime logs" },
-  ];
-};
-
-export default function AdminDashboard() {
+export default function SuperAdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
   const FIXED_SHIFT_START = { time: "9:00", period: "AM" };
@@ -123,7 +86,7 @@ export default function AdminDashboard() {
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState(() => createDefaultScheduleForm());
-  const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [attendanceDate, setAttendanceDate] = useState("");
   const [editingCoachAttendance, setEditingCoachAttendance] = useState(null);
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
   const [editAttendanceMessage, setEditAttendanceMessage] = useState("");
@@ -132,8 +95,8 @@ export default function AdminDashboard() {
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
-  const { confirm } = useFeedback();
-  const { hasPermission } = usePermissions();
+  const { confirm, showToast } = useFeedback();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,
@@ -142,7 +105,7 @@ export default function AdminDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"];
+  const attendanceNavItems = useMemo(() => ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"], []);
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
@@ -167,6 +130,10 @@ export default function AdminDashboard() {
   ];
 
   useEffect(() => {
+    if (permissionsLoading) {
+      return;
+    }
+
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
       || activeNav === "Profile"
@@ -204,9 +171,8 @@ export default function AdminDashboard() {
       setActiveNav("Control Panel");
       return;
     }
-
     setActiveNav("Profile");
-  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam, permissionsLoading]);
 
   const normalizeScheduleForm = coachSchedule => {
     const nextForm = createDefaultScheduleForm();
@@ -336,6 +302,18 @@ export default function AdminDashboard() {
     };
   };
 
+  const getCoachScheduleStatusForToday = coachSchedule => {
+    const dayIndexToLabel = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const todayLabel = dayIndexToLabel[new Date().getDay()];
+    const assignedDays = Array.isArray(coachSchedule?.days) ? coachSchedule.days : [];
+    const isScheduledToday = assignedDays.includes(todayLabel);
+
+    return {
+      label: isScheduledToday ? "Scheduled" : "Not Scheduled",
+      className: isScheduledToday ? "is-scheduled" : "is-not-scheduled"
+    };
+  };
+
   const getAutomaticShiftType = (startTime, startPeriod) => {
     const startMinutes = toMinutes(startTime, startPeriod);
     if (startMinutes === null) return "Morning Shift";
@@ -400,7 +378,7 @@ export default function AdminDashboard() {
     );
   };
 
-  const persistAttendance = async nextAttendance => {
+  const persistAttendance = async (nextAttendance, actionType) => {
     setIsSavingAttendance(true);
 
     try {
@@ -420,7 +398,19 @@ export default function AdminDashboard() {
       };
 
       setAttendanceLog(savedAttendance);
+      showToast({
+        title: actionType === "in" ? "Clock-In Successful" : "Clock-Out Successful",
+        message: `You have successfully clocked ${actionType === "in" ? "in" : "out"} for today.`,
+        type: "success"
+      });
       return savedAttendance;
+    } catch (error) {
+      showToast({
+        title: actionType === "in" ? "Clock-In Failed" : "Clock-Out Failed",
+        message: error?.error ?? error?.message ?? `Unable to process clock-${actionType}.`,
+        type: "error"
+      });
+      throw error;
     } finally {
       setIsSavingAttendance(false);
     }
@@ -438,7 +428,7 @@ export default function AdminDashboard() {
       timeInAt: now,
       timeOutAt: null,
       tag
-    });
+    }, "in");
 
     if (activeNav === "Attendance") {
       const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
@@ -452,7 +442,7 @@ export default function AdminDashboard() {
     await persistAttendance({
       ...attendanceLog,
       timeOutAt: new Date()
-    });
+    }, "out");
 
     if (activeNav === "Attendance") {
       const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
@@ -488,8 +478,17 @@ export default function AdminDashboard() {
       });
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
+      showToast({
+        title: "Status Updated",
+        message: `Request for ${request.employee_name} has been ${status.toLowerCase()} successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to finalize file request status.");
+      showToast({
+        title: "Action Failed",
+        message: error?.error ?? error?.message ?? "Unable to finalize file request status.",
+        type: "error"
+      });
     } finally {
       setRequestActionLoadingId("");
     }
@@ -595,9 +594,17 @@ export default function AdminDashboard() {
         });
       }
 
-      setEditAttendanceMessage("Attendance updated successfully.");
+      showToast({
+        title: "Attendance Updated",
+        message: "Attendance record updated successfully.",
+        type: "success"
+      });
     } catch (error) {
-      setEditAttendanceMessage(error?.error ?? "Unable to update attendance record.");
+      showToast({
+        title: "Update Failed",
+        message: error?.error ?? "Unable to update attendance record.",
+        type: "error"
+      });
     } finally {
       setIsSavingEditAttendance(false);
     }
@@ -744,9 +751,18 @@ export default function AdminDashboard() {
         })
       });
       await fetchClusters();
+      showToast({
+        title: "Schedule Saved",
+        message: "Team coach schedule has been updated successfully.",
+        type: "success"
+      });
       handleCloseScheduleModal();
     } catch (error) {
-      setScheduleModalMessage(error?.error ?? "Unable to save schedule.");
+      showToast({
+        title: "Save Failed",
+        message: error?.error ?? "Unable to save schedule.",
+        type: "error"
+      });
     } finally {
       setIsSavingSchedule(false);
     }
@@ -799,9 +815,50 @@ const handleOpenRejectModal = cluster => {
     }
   };
 
-  const myRequestHighlights = buildRequestHighlights(myRequests);
-  const teamRequestHighlights = buildRequestHighlights(teamRequests);
-  const allAttendanceHighlights = useMemo(() => buildAllAttendanceHighlights(allAttendance), [allAttendance]);
+  const [myRequestsFilter, setMyRequestsFilter] = useState(null);
+  const [teamRequestsFilter, setTeamRequestsFilter] = useState(null);
+  const [allAttendanceFilter, setAllAttendanceFilter] = useState(null);
+
+  const filteredAllAttendance = useMemo(() => {
+    const normalized = normalizeAttendanceHistoryRecords(allAttendance);
+    if (!allAttendanceFilter || allAttendanceFilter === HIGHLIGHT_IDS.TOTAL_HOURS || allAttendanceFilter === HIGHLIGHT_IDS.DAYS_PRESENT) return normalized;
+    return normalized.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (allAttendanceFilter === HIGHLIGHT_IDS.LATE) return status.includes("late");
+      if (allAttendanceFilter === HIGHLIGHT_IDS.OVERTIME) return status.includes("overtime") || status.includes("over time");
+      return true;
+    });
+  }, [allAttendance, allAttendanceFilter]);
+
+  const filteredMyRequests = useMemo(() => {
+    if (!myRequestsFilter || myRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return myRequests;
+    return myRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (myRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (myRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (myRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [myRequests, myRequestsFilter]);
+
+  const filteredTeamRequests = useMemo(() => {
+    if (!teamRequestsFilter || teamRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return teamRequests;
+    return teamRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (teamRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [teamRequests, teamRequestsFilter]);
+
+  const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
+  const teamRequestHighlights = useMemo(() => buildRequestHighlights(teamRequests), [teamRequests]);
+  const allAttendanceHighlights = useMemo(() => buildAttendanceHighlights(normalizeAttendanceHistoryRecords(allAttendance)), [allAttendance]);
+
+  const handleHighlightFilterChange = (setter) => (id) => {
+    setter(current => current === id ? null : id);
+  };
 
   const formatDate = dateString => {
     if (!dateString) return "—";
@@ -927,10 +984,14 @@ const handleOpenRejectModal = cluster => {
                 <p className="employee-card-subtitle">Review all attendance logs across employees and coaches with the same polished summary view used in My Attendance.</p>
               </div>
               <div className="employee-card-body">
-                <AttendanceHistoryHighlights highlights={allAttendanceHighlights} />
+                <AttendanceHistoryHighlights
+                  highlights={allAttendanceHighlights}
+                  activeFilter={allAttendanceFilter}
+                  onFilterChange={handleHighlightFilterChange(setAllAttendanceFilter)}
+                />
                 <DataPanel
                   type="attendance"
-                  records={allAttendance}
+                  records={filteredAllAttendance}
                   personField="employee_name"
                   personLabel="Name"
                   onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
@@ -943,8 +1004,12 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "My Requests" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Requests</div>
-            <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-            <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
+            <AttendanceHistoryHighlights
+              highlights={myRequestHighlights}
+              activeFilter={myRequestsFilter}
+              onFilterChange={handleHighlightFilterChange(setMyRequestsFilter)}
+            />
+            <DataPanel type="requests" records={filteredMyRequests} enableRequestFilters showRequestActionBy />
           </section>
         ) : activeNav === "My Filing Center" && canViewAttendance ? (
           <section className="content">
@@ -954,11 +1019,15 @@ const handleOpenRejectModal = cluster => {
           <section className="content">
             <div className="section-title">File Requests</div>
             <p className="table-subtitle">Endorsed file requests waiting for final admin approval or rejection.</p>
-            <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
+            <AttendanceHistoryHighlights
+              highlights={teamRequestHighlights}
+              activeFilter={teamRequestsFilter}
+              onFilterChange={handleHighlightFilterChange(setTeamRequestsFilter)}
+            />
             {teamRequestsError && <div className="error">{teamRequestsError}</div>}
             <DataPanel
               type="requests"
-              records={teamRequests}
+              records={filteredTeamRequests}
               onRequestAction={handleAdminTeamRequestAction}
               requestActionLoadingId={requestActionLoadingId}
               requestActions={[
@@ -981,7 +1050,7 @@ const handleOpenRejectModal = cluster => {
               <div className="empty-state">No team clusters available.</div>
             ) : (
               <>
-                <div className="table-card">
+                <div className="table-card team-coach-overview-table">
                   <div className="table-header">
                     <div>Coach</div>
                     <div>Cluster Name</div>
@@ -989,21 +1058,27 @@ const handleOpenRejectModal = cluster => {
                     <div>Status</div>
                     <div>Action</div>
                   </div>
-                  {clusters.map(cluster => (
+                  {clusters.map(cluster => {
+                    const todayScheduleStatus = getCoachScheduleStatusForToday(cluster.coach_schedule);
+
+                    return (
                     <div key={cluster.id} className="table-row">
                       <div className="table-cell">{cluster.coach}</div>
                       <div className="table-cell">{cluster.name}</div>
                       <div className="table-cell">{cluster.members ?? 0}</div>
                       <div className="table-cell">
-                        <span className={`badge ${cluster.status}`}>{cluster.status}</span>
+                        <span className={`badge team-coach-status-badge ${todayScheduleStatus.className}`}>
+                          {todayScheduleStatus.label}
+                        </span>
                       </div>
-                      <div className="table-cell">
-                        <button className="btn primary" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
-                          Manage Team Coach Schedule
+                      <div className="table-cell team-coach-action-cell">
+                        <button className="btn primary team-coach-manage-btn" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
+                          Manage Schedule (Team Coach)
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="section-title">Team Coach Schedule by Coach</div>
@@ -1022,32 +1097,38 @@ const handleOpenRejectModal = cluster => {
                   <div className="active-members-schedule-body" role="rowgroup">
                     {[...clusters]
                       .sort((a, b) => (a.coach ?? "").localeCompare(b.coach ?? ""))
-                      .map(cluster => (
-                        <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
-                          <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
-                          {dayOptions.map(day => {
-                            const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
+                      .map(cluster => {
+                        const todayScheduleStatus = getCoachScheduleStatusForToday(cluster.coach_schedule);
 
-                            if (typeof daySchedule === "string") {
+                        return (
+                          <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row team-coach-schedule-row" role="row">
+                            <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
+                            {dayOptions.map(day => {
+                              const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
+
+                              if (typeof daySchedule === "string") {
+                                return (
+                                  <div key={`${cluster.id}-${day}`} role="cell">{daySchedule}</div>
+                                );
+                              }
+
                               return (
-                                <div key={`${cluster.id}-${day}`} role="cell">{daySchedule}</div>
+                                <div key={`${cluster.id}-${day}`} role="cell" className="active-day-cell">
+                                  <div>{daySchedule.shift}</div>
+                                  <span className="active-day-tag break-tag">
+                                    Break time: {daySchedule.breakTime}
+                                  </span>
+                                </div>
                               );
-                            }
-
-                            return (
-                              <div key={`${cluster.id}-${day}`} role="cell" className="active-day-cell">
-                                <div>{daySchedule.shift}</div>
-                                <span className="active-day-tag break-tag">
-                                  Break time: {daySchedule.breakTime}
-                                </span>
-                              </div>
-                            );
-                          })}
-                          <div role="cell" className="member-status-and-tags-cell">
-                            <span className={`badge ${cluster.status}`}>{cluster.status}</span>
+                            })}
+                            <div role="cell" className="member-status-and-tags-cell">
+                              <span className={`badge team-coach-status-badge ${todayScheduleStatus.className}`}>
+                                {todayScheduleStatus.label}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               </>
@@ -1082,7 +1163,6 @@ const handleOpenRejectModal = cluster => {
               </div>
               <div className="attendance-edit-actions">
                 <button className="btn primary" type="button" disabled={isSavingEditAttendance} onClick={saveCoachAttendanceEdit}>{isSavingEditAttendance ? "Saving..." : "Save Attendance"}</button>
-                {editAttendanceMessage && <span className="attendance-detail-value">{editAttendanceMessage}</span>}
               </div>
             </div>
           </section>
@@ -1272,7 +1352,6 @@ const handleOpenRejectModal = cluster => {
                   })}
                 </div>
               </div>
-              {scheduleModalMessage && <div className="success-message">{scheduleModalMessage}</div>}
               <div className="form-actions">
                 <button className="btn secondary" type="button" onClick={handleCloseScheduleModal}>
                   Cancel

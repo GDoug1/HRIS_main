@@ -1,6 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-
-const FeedbackContext = createContext(null);
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FeedbackContext } from "./FeedbackContext";
 
 export function FeedbackProvider({ children }) {
   const [toasts, setToasts] = useState([]);
@@ -59,14 +58,14 @@ export function FeedbackProvider({ children }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeDialog, dialogState]);
 
-  const confirm = useCallback(options => new Promise(resolve => {
+  const confirm = useCallback(({ title, message, confirmLabel, cancelLabel, variant = "primary" } = {}) => new Promise(resolve => {
     setDialogState({
       kind: "confirm",
-      title: options?.title || "Confirm action",
-      message: options?.message || "",
-      confirmLabel: options?.confirmLabel || "Confirm",
-      cancelLabel: options?.cancelLabel || "Cancel",
-      variant: options?.variant || "primary",
+      title: title || "Confirm action",
+      message: message || "",
+      confirmLabel: confirmLabel || "Confirm",
+      cancelLabel: cancelLabel || "Cancel",
+      variant,
       resolve
     });
   }), []);
@@ -107,22 +106,25 @@ export function FeedbackProvider({ children }) {
       </div>
 
       {dialogState ? (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={dialogState.title} onClick={() => closeDialog(false)}>
-          <div className="modal-card confirm-modal-card" onClick={event => event.stopPropagation()}>
-            <div>
-              <h3 className="confirm-modal-title">{dialogState.title}</h3>
+        <div className="modal-overlay" role="presentation" onClick={() => closeDialog(false)}>
+          <div className="modal-card confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title" onClick={event => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3 id="confirm-title" className="confirm-modal-title">{dialogState.title}</h3>
+            </div>
+            
+            <div className="modal-body">
               <p className="confirm-modal-message feedback-dialog-message">{dialogState.message}</p>
             </div>
 
             <div className="confirm-modal-actions">
               {dialogState.kind === "confirm" ? (
-                <button className="btn confirm-cancel-btn" type="button" onClick={() => closeDialog(false)}>
+                <button className="btn secondary" type="button" onClick={() => closeDialog(false)}>
                   {dialogState.cancelLabel}
                 </button>
               ) : null}
 
               <button
-                className={`btn ${dialogState.variant === "danger" ? "confirm-danger-btn" : "primary"}`}
+                className={`btn is-${dialogState.variant}`}
                 type="button"
                 onClick={() => closeDialog(true)}
               >
@@ -134,13 +136,4 @@ export function FeedbackProvider({ children }) {
       ) : null}
     </FeedbackContext.Provider>
   );
-}
-
-export function useFeedback() {
-  const context = useContext(FeedbackContext);
-  if (!context) {
-    throw new Error("useFeedback must be used within a FeedbackProvider.");
-  }
-
-  return context;
 }

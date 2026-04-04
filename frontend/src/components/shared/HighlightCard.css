@@ -1,0 +1,114 @@
+.highlight-card {
+  position: relative;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  user-select: none;
+  min-height: 120px;
+}
+
+.highlight-card.is-clickable {
+  cursor: pointer;
+}
+
+.highlight-card.is-clickable:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.highlight-card.is-clickable:active {
+  transform: translateY(0);
+}
+
+.highlight-card.is-active {
+  border-color: currentColor;
+  background-color: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Header & Label */
+.highlight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.highlight-label {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Icons & Colors */
+.highlight-icon-wrapper {
+  padding: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.highlight-card:hover .highlight-icon-wrapper {
+  transform: scale(1.1);
+}
+
+/* Theme Colors */
+.highlight-card.is-slate { color: #475569; }
+.highlight-card.is-slate .highlight-icon-wrapper { background-color: #f1f5f9; color: #475569; }
+
+.highlight-card.is-blue { color: #2563eb; }
+.highlight-card.is-blue .highlight-icon-wrapper { background-color: #eff6ff; color: #2563eb; }
+
+.highlight-card.is-green { color: #16a34a; }
+.highlight-card.is-green .highlight-icon-wrapper { background-color: #f0fdf4; color: #16a34a; }
+
+.highlight-card.is-amber { color: #d97706; }
+.highlight-card.is-amber .highlight-icon-wrapper { background-color: #fffbeb; color: #d97706; }
+
+.highlight-card.is-red { color: #dc2626; }
+.highlight-card.is-red .highlight-icon-wrapper { background-color: #fef2f2; color: #dc2626; }
+
+/* Metrics */
+.highlight-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.highlight-subvalue {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Active Indicator */
+.highlight-active-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: currentColor;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .highlight-card {
+    padding: 16px;
+  }
+  
+  .highlight-value {
+    font-size: 1.5rem;
+  }
+}

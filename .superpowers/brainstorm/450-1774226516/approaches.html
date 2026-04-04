@@ -1,0 +1,57 @@
+<h2>Accessibility & UI Consistency Approaches</h2>
+<p class="subtitle">Comparing strategies for the remediation work</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Surgical Refinement (Recommended)</h3>
+      <p>Targeted fixes for date formatting, themed confirmation modals, and icon-based actions. Low risk, high impact.</p>
+      <ul>
+        <li>Centralized <code>dateUtils.js</code></li>
+        <li>Themed <code>confirm()</code> via existing FeedbackProvider</li>
+        <li>Direct integration in existing components</li>
+      </ul>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Modern Standards & Consistency</h3>
+      <p>Refactors repeated UI patterns into shared components for better long-term maintainability.</p>
+      <ul>
+        <li>Shared <code>BaseModal</code> and <code>StatusBadge</code></li>
+        <li>Reusable <code>ConfirmButton</code> to reduce boilerplate</li>
+        <li>More consistent look and feel across dashboards</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Modal Style Mockups</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Standard Action</div>
+      <div class="mockup-body" style="padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 8px;">
+        <h4 style="margin-top:0">Submit Request?</h4>
+        <p>Please confirm that you want to submit this filing.</p>
+        <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button class="mock-button" style="background: #eee; color: #333;">Cancel</button>
+          <button class="mock-button" style="background: #357AF4; color: #fff;">Confirm</button>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Danger/Rejection Action</div>
+      <div class="mockup-body" style="padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 8px;">
+        <h4 style="margin-top:0; color: #d93025;">Reject Request?</h4>
+        <p>This will deny the request permanently. Proceed?</p>
+        <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button class="mock-button" style="background: #eee; color: #333;">Cancel</button>
+          <button class="mock-button" style="background: #d93025; color: #fff;">Reject</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

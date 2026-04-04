@@ -11,14 +11,17 @@ import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import ProfileSection from "../components/ProfileSection";
-import { buildRequestHighlights, fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
+import { fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
-import { useFeedback } from "../components/FeedbackProvider";
+import { useFeedback } from "../components/FeedbackContext";
+import { formatFullDate, formatDateTime } from "../utils/dateUtils";
+import { buildRequestHighlights, HIGHLIGHT_IDS } from "../utils/highlightUtils";
+import { Users, LogIn, CheckCircle } from "lucide-react";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -90,12 +93,6 @@ const toSqlDateTimeValue = value => {
   return `${value.replace("T", " ")}:00`;
 };
 
-const formatDateTimeLabel = value => {
-  if (!value) return "—";
-  const parsedDate = parseDateTimeValue(value);
-  return parsedDate ? parsedDate.toLocaleString() : value;
-};
-
 export default function CoachDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
@@ -125,29 +122,23 @@ export default function CoachDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [formValues, setFormValues] = useState({ name: "", description: "" });
   const [editingClusterId, setEditingClusterId] = useState(null);
-  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReuploading, setIsReuploading] = useState(false);
   const [activeCluster, setActiveCluster] = useState(null);
   const [members, setMembers] = useState([]);
-  const [memberError, setMemberError] = useState("");
   const [memberLoading, setMemberLoading] = useState(false);
   const [availableEmployees, setAvailableEmployees] = useState([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);
-  const [employeeError, setEmployeeError] = useState("");
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [scheduleMember, setScheduleMember] = useState(null);
-  const [scheduleError, setScheduleError] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [isDeletingMember, setIsDeletingMember] = useState(false);
   const [isDisbanding, setIsDisbanding] = useState(false);
   const [activeMembers, setActiveMembers] = useState([]);
   const [activeMembersLoading, setActiveMembersLoading] = useState(false);
-  const [activeMembersError, setActiveMembersError] = useState("");
-  const [confirmState, setConfirmState] = useState(null);
   const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [coachAttendanceHistory, setCoachAttendanceHistory] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
@@ -160,11 +151,9 @@ export default function CoachDashboard() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedAttendanceEntry, setSelectedAttendanceEntry] = useState(null);
   const [attendanceEditForm, setAttendanceEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
-  const [attendanceSaveError, setAttendanceSaveError] = useState("");
   const [isSavingAttendanceEdit, setIsSavingAttendanceEdit] = useState(false);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [teamRequests, setTeamRequests] = useState([]);
-  const [teamRequestsError, setTeamRequestsError] = useState("");
   const [requestActionLoadingId, setRequestActionLoadingId] = useState("");
   const [scheduleForm, setScheduleForm] = useState({
     days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
@@ -178,8 +167,8 @@ export default function CoachDashboard() {
   });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
-  const { confirm } = useFeedback();
-  const { hasPermission } = usePermissions();
+  const { confirm, showToast } = useFeedback();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,
@@ -189,9 +178,10 @@ export default function CoachDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "File Request"];
+  const attendanceNavItems = useMemo(() => ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "File Request"], []);
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
+  const [filingCenterInitialDate, setFilingCenterInitialDate] = useState("");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
     ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
@@ -216,6 +206,10 @@ export default function CoachDashboard() {
 
 
   useEffect(() => {
+    if (permissionsLoading) {
+      return;
+    }
+
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
       || activeNav === "Profile"
@@ -255,7 +249,7 @@ export default function CoachDashboard() {
     }
 
     setActiveNav("Profile");
-  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam, permissionsLoading]);
 
   useEffect(() => {
     if (window.location.pathname === "/coach/attendance") {
@@ -300,8 +294,8 @@ export default function CoachDashboard() {
         workSetup: baseSchedule.workSetup ?? baseSchedule.work_setup ?? "Onsite",
         breakStartTime: baseSchedule.breakStartTime ?? baseSchedule.breakTime ?? "3:00",
         breakStartPeriod: baseSchedule.breakStartPeriod ?? baseSchedule.breakPeriod ?? "PM",
-        breakEndTime: baseSchedule.breakEndTime ?? "3:30",
-        breakEndPeriod: baseSchedule.breakEndPeriod ?? "PM"
+        breakEndTime: baseSchedule.breakEndTime ?? baseSchedule.breakEndTime ?? "3:30",
+        breakEndPeriod: baseSchedule.breakEndPeriod ?? baseSchedule.breakEndPeriod ?? "PM"
       };
     });
 
@@ -322,8 +316,8 @@ export default function CoachDashboard() {
           workSetup: value.workSetup ?? value.work_setup ?? daySchedules[day].workSetup,
           breakStartTime: value.breakStartTime ?? value.breakTime ?? daySchedules[day].breakStartTime,
           breakStartPeriod: value.breakStartPeriod ?? value.breakPeriod ?? daySchedules[day].breakStartPeriod,
-          breakEndTime: value.breakEndTime ?? daySchedules[day].breakEndTime,
-          breakEndPeriod: value.breakEndPeriod ?? daySchedules[day].breakEndPeriod
+          breakEndTime: value.breakEndTime ?? value.breakEndTime ?? daySchedules[day].breakEndTime,
+          breakEndPeriod: value.breakEndPeriod ?? value.breakEndPeriod ?? daySchedules[day].breakEndPeriod
         };
       });
     }
@@ -624,15 +618,14 @@ export default function CoachDashboard() {
     apiFetch("api/coach/coach_clusters.php")
       .then(setClusters)
       .catch(err => {
-        setError(err?.error ?? "Unable to load team clusters.");
+        showToast({ title: "Load Failed", message: err?.error ?? "Unable to load team clusters.", type: "error" });
       });
-  }, [canViewTeam]);
+  }, [canViewTeam, showToast]);
 
   useEffect(() => {
     if (!canViewTeam) {
       setActiveMembers([]);
       setAttendanceRows([]);
-      setActiveMembersError("");
       setActiveMembersLoading(false);
       return;
     }
@@ -641,13 +634,11 @@ export default function CoachDashboard() {
     if (!active) {
       setActiveMembers([]);
       setAttendanceRows([]);
-      setActiveMembersError("");
       setActiveMembersLoading(false);
       return;
     }
 
     setActiveMembersLoading(true);
-    setActiveMembersError("");
 
     apiFetch(`api/coach/manage_members.php?cluster_id=${active.id}&attendance_date=${attendanceDateFilter}`)
       .then(memberData => {
@@ -659,19 +650,17 @@ export default function CoachDashboard() {
         setAttendanceRows(normalizedMembers);
       })
       .catch(err => {
-        setActiveMembersError(err?.error ?? "Unable to load active team members.");
+        showToast({ title: "Load Failed", message: err?.error ?? "Unable to load active team members.", type: "error" });
       })
       .finally(() => {
         setActiveMembersLoading(false);
       });
-  }, [attendanceDateFilter, canViewTeam, clusters]);
+  }, [attendanceDateFilter, canViewTeam, clusters, showToast]);
 
   useEffect(() => {
     if (!canViewTeam || !activeCluster) return;
     setMemberLoading(true);
     setEmployeeLoading(true);
-    setMemberError("");
-    setEmployeeError("");
     setShowMemberForm(false);
     setSelectedEmployees([]);
     setEmployeeSearchQuery("");
@@ -692,15 +681,13 @@ export default function CoachDashboard() {
         );
       })
       .catch(err => {
-        const message = err?.error ?? "Unable to load team members.";
-        setMemberError(message);
-        setEmployeeError(message);
+        showToast({ title: "Load Failed", message: err?.error ?? "Unable to load team members.", type: "error" });
       })
       .finally(() => {
         setMemberLoading(false);
         setEmployeeLoading(false);
       });
-  }, [activeCluster, canViewTeam]);
+  }, [activeCluster, canViewTeam, showToast]);
 
   useEffect(() => {
     if (!canViewAttendance) {
@@ -729,29 +716,50 @@ export default function CoachDashboard() {
     loadCoachAttendance();
   }, [canViewAttendance]);
 
-  const persistAttendance = async nextAttendance => {
+  const persistAttendance = async (nextAttendance, actionType) => {
     if (!dashboardCluster?.id) return;
 
-    const savedAttendance = await saveDashboardAttendance({
-      clusterId: dashboardCluster.id,
-      nextAttendance
-    });
+    try {
+      const savedAttendance = await saveDashboardAttendance({
+        clusterId: dashboardCluster.id,
+        nextAttendance
+      });
 
-    setAttendanceLog(savedAttendance);
-    if (canViewAttendance) {
-      const history = await apiFetch("api/coach/coach_attendance_history.php");
-      setCoachAttendanceHistory(Array.isArray(history) ? history : []);
+      setAttendanceLog(savedAttendance);
+      showToast({
+        title: actionType === "in" ? "Clock-In Successful" : "Clock-Out Successful",
+        message: `You have successfully clocked ${actionType === "in" ? "in" : "out"} for today.`,
+        type: "success"
+      });
+
+      if (canViewAttendance) {
+        const history = await apiFetch("api/coach/coach_attendance_history.php");
+        setCoachAttendanceHistory(Array.isArray(history) ? history : []);
+      }
+    } catch (error) {
+      showToast({
+        title: actionType === "in" ? "Clock-In Failed" : "Clock-Out Failed",
+        message: error?.error ?? error?.message ?? `Unable to process clock-${actionType}.`,
+        type: "error"
+      });
     }
   };
 
   const handleCoachTimeIn = async () => {
     if (!canSetAttendance || !dashboardCluster?.id || !todayCoachSchedule || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
-    await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
+    await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" }, "in");
   };
 
   const handleCoachTimeOut = async () => {
     if (!canSetAttendance || !dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
-    await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
+    const hasConfirmed = await confirm({
+      title: "Time Out?",
+      message: "Are you sure you want to log your time out for today?",
+      confirmLabel: "Time Out",
+      variant: "primary"
+    });
+    if (!hasConfirmed) return;
+    await persistAttendance({ ...attendanceLog, timeOutAt: new Date() }, "out");
   };
 
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
@@ -801,38 +809,19 @@ export default function CoachDashboard() {
     };
   });
 
-  // const handleLogout = async () => {
-  //   try {
-  //     await apiFetch("auth/logout.php", { method: "POST" });
-  //   } catch {
-  //     console.error("Logout failed", error);
-  //   } finally {
-  //     localStorage.removeItem("teamClusterUser");
-  //     window.location.href = "/login";
-  //   }
-  // };
-
   const handleChange = event => {
     const { name, value } = event.target;
     setFormValues(prev => ({ ...prev, [name]: value }));
-  };
-
-  const formatDate = value => {
-    if (!value) return "—";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toISOString().slice(0, 10);
   };
 
   const handleSubmit = async event => {
     event.preventDefault();
     if (isSubmitting) return;
     if (clusters.length > 0) {
-      setError("Only one team cluster is allowed per team coach.");
+      showToast({ title: "Action Denied", message: "Only one team cluster is allowed per team coach.", type: "error" });
       return;
     }
     setIsSubmitting(true);
-    setError("");
 
     try {
       const payload = {
@@ -848,8 +837,9 @@ export default function CoachDashboard() {
       setClusters(prev => [created, ...prev]);
       setFormValues({ name: "", description: "" });
       setShowForm(false);
+      showToast({ title: "Cluster Created", message: `Cluster "${created.name}" created successfully.`, type: "success" });
     } catch (err) {
-      setError(err?.error ?? "Unable to create cluster.");
+      showToast({ title: "Creation Failed", message: err?.error ?? "Unable to create cluster.", type: "error" });
     } finally {
       setIsSubmitting(false);
     }
@@ -859,7 +849,6 @@ export default function CoachDashboard() {
     setShowForm(false);
     setEditingClusterId(null);
     setFormValues({ name: "", description: "" });
-    setError("");
   };
 
   const handleManageClick = cluster => {
@@ -875,7 +864,6 @@ export default function CoachDashboard() {
       name: cluster.name ?? "",
       description: cluster.description ?? ""
     });
-    setError("");
   };
 
   const handleReuploadCluster = async cluster => {
@@ -885,12 +873,11 @@ export default function CoachDashboard() {
     const trimmedDescription = formValues.description.trim();
 
     if (!trimmedName) {
-      setError("Cluster name is required.");
+      showToast({ title: "Input Required", message: "Cluster name is required.", type: "error" });
       return;
     }
 
     setIsReuploading(true);
-    setError("");
 
     try {
       await apiFetch("api/coach/resubmit_cluster.php", {
@@ -917,8 +904,9 @@ export default function CoachDashboard() {
       setEditingClusterId(null);
       setShowForm(false);
       setFormValues({ name: "", description: "" });
+      showToast({ title: "Cluster Resubmitted", message: "Cluster has been re-uploaded for review.", type: "success" });
     } catch (err) {
-      setError(err?.error ?? "Unable to re-upload cluster for review.");
+      showToast({ title: "Resubmission Failed", message: err?.error ?? "Unable to re-upload cluster for review.", type: "error" });
     } finally {
       setIsReuploading(false);
     }
@@ -926,42 +914,43 @@ export default function CoachDashboard() {
 
   const handleDisbandCluster = async cluster => {
     if (!cluster || isDisbanding) return;
-    setConfirmState({
+    const hasConfirmed = await confirm({
       title: "Disband cluster?",
       message: `Disband ${cluster.name}? This will remove all members and schedules.`,
       confirmLabel: "Disband",
-      variant: "danger",
-      onConfirm: async () => {
-        setIsDisbanding(true);
-        setError("");
-
-        try {
-          await apiFetch("api/coach/disband_cluster.php", {
-            method: "POST",
-            body: JSON.stringify({ cluster_id: cluster.id })
-          });
-          setClusters(prev => prev.filter(item => item.id !== cluster.id));
-          if (activeCluster?.id === cluster.id) {
-            handleCloseModal();
-          }
-          setShowForm(false);
-        } catch (err) {
-          setError(err?.error ?? "Unable to disband cluster.");
-        } finally {
-          setIsDisbanding(false);
-        }
-      }
+      variant: "danger"
     });
+    if (!hasConfirmed) return;
+
+    setIsDisbanding(true);
+
+    try {
+      await apiFetch("api/coach/disband_cluster.php", {
+        method: "POST",
+        body: JSON.stringify({ cluster_id: cluster.id })
+      });
+      setClusters(prev => prev.filter(item => item.id !== cluster.id));
+      showToast({
+        title: "Cluster Disbanded",
+        message: `Cluster "${cluster.name}" has been disbanded.`,
+        type: "success"
+      });
+      if (activeCluster?.id === cluster.id) {
+        handleCloseModal();
+      }
+      setShowForm(false);
+    } catch (err) {
+      showToast({ title: "Action Failed", message: err?.error ?? "Unable to disband cluster.", type: "error" });
+    } finally {
+      setIsDisbanding(false);
+    }
   };
 
   const handleCloseModal = () => {
     setActiveCluster(null);
     setMembers([]);
     setAvailableEmployees([]);
-    setMemberError("");
-    setEmployeeError("");
     setScheduleMember(null);
-    setScheduleError("");
     setShowMemberForm(false);
     setSelectedEmployees([]);
     setEmployeeSearchQuery("");
@@ -970,13 +959,11 @@ export default function CoachDashboard() {
   const handleOpenSchedule = member => {
     const normalizedSchedule = normalizeSchedule(member?.schedule);
     setScheduleMember({ ...member, schedule: normalizedSchedule });
-    setScheduleError("");
     setScheduleForm(buildScheduleForm(normalizedSchedule));
   };
 
   const handleCloseSchedule = () => {
     setScheduleMember(null);
-    setScheduleError("");
   };
 
   const handleToggleDay = day => {
@@ -1167,7 +1154,6 @@ export default function CoachDashboard() {
   const handleSaveSchedule = async () => {
     if (!scheduleMember || !activeCluster || isSavingSchedule) return;
     setIsSavingSchedule(true);
-    setScheduleError("");
 
     try {
       const payload = {
@@ -1198,9 +1184,14 @@ export default function CoachDashboard() {
       setScheduleMember(prev =>
         prev ? { ...prev, schedule: scheduleForm } : prev
       );
+      showToast({
+        title: "Schedule Saved",
+        message: `Schedule for ${scheduleMember.fullname} updated successfully.`,
+        type: "success"
+      });
       handleCloseSchedule();
     } catch (err) {
-      setScheduleError(err?.error ?? "Unable to save schedule.");
+      showToast({ title: "Save Failed", message: err?.error ?? "Unable to save schedule.", type: "error" });
     } finally {
       setIsSavingSchedule(false);
     }
@@ -1209,7 +1200,6 @@ export default function CoachDashboard() {
   const handleAddMember = async () => {
     if (selectedEmployees.length === 0 || isAddingMember || !activeCluster) return;
     setIsAddingMember(true);
-    setMemberError("");
 
     try {
       const added = await apiFetch("api/coach/add_member.php", {
@@ -1233,6 +1223,11 @@ export default function CoachDashboard() {
       setSelectedEmployees([]);
       setEmployeeSearchQuery("");
       setShowMemberForm(false);
+      showToast({
+        title: "Members Added",
+        message: `${added?.added_count ?? 0} member(s) successfully added to the cluster.`,
+        type: "success"
+      });
       setClusters(prev =>
         prev.map(cluster =>
           cluster.id === activeCluster.id
@@ -1244,7 +1239,7 @@ export default function CoachDashboard() {
         )
       );
     } catch (err) {
-      setMemberError(err?.error ?? "Unable to add member(s).");
+      showToast({ title: "Action Failed", message: err?.error ?? "Unable to add member(s).", type: "error" });
     } finally {
       setIsAddingMember(false);
     }
@@ -1252,65 +1247,111 @@ export default function CoachDashboard() {
 
   const handleDeleteMember = async member => {
     if (!member || !activeCluster || isDeletingMember) return;
-    setConfirmState({
+    const hasConfirmed = await confirm({
       title: "Remove member?",
       message: `Remove ${member.fullname} from ${activeCluster.name}?`,
       confirmLabel: "Remove",
-      variant: "danger",
-      onConfirm: async () => {
-        setIsDeletingMember(true);
-        setMemberError("");
-
-        try {
-          await apiFetch("api/coach/delete_member.php", {
-            method: "POST",
-            body: JSON.stringify({
-              cluster_id: activeCluster.id,
-              employee_id: member.id
-            })
-          });
-
-          setMembers(prev => prev.filter(item => item.id !== member.id));
-          setActiveMembers(prev => prev.filter(item => item.id !== member.id));
-          setAvailableEmployees(prev => [...prev, { id: member.id, fullname: member.fullname }]);
-          setClusters(prev =>
-            prev.map(cluster =>
-              cluster.id === activeCluster.id
-                ? {
-                    ...cluster,
-                    members: Math.max(Number(cluster.members ?? 1) - 1, 0)
-                  }
-                : cluster
-            )
-          );
-        } catch (err) {
-          setMemberError(err?.error ?? "Unable to remove member.");
-        } finally {
-          setIsDeletingMember(false);
-        }
-      }
+      variant: "danger"
     });
-  };
+    if (!hasConfirmed) return;
 
-      const handleConfirmAction = async () => {
-    if (!confirmState?.onConfirm) return;
-    await confirmState.onConfirm();
-    setConfirmState(null);
+    setIsDeletingMember(true);
+
+    try {
+      await apiFetch("api/coach/delete_member.php", {
+        method: "POST",
+        body: JSON.stringify({
+          cluster_id: activeCluster.id,
+          employee_id: member.id
+        })
+      });
+
+      setMembers(prev => prev.filter(item => item.id !== member.id));
+      setActiveMembers(prev => prev.filter(item => item.id !== member.id));
+      setAvailableEmployees(prev => [...prev, { id: member.id, fullname: member.fullname }]);
+      setClusters(prev =>
+        prev.map(cluster =>
+          cluster.id === activeCluster.id
+            ? {
+                ...cluster,
+                members: Math.max(Number(cluster.members ?? 1) - 1, 0)
+              }
+            : cluster
+        )
+      );
+      showToast({ title: "Member Removed", message: `${member.fullname} has been removed from the cluster.`, type: "success" });
+    } catch (err) {
+      showToast({ title: "Action Failed", message: err?.error ?? "Unable to remove member.", type: "error" });
+    } finally {
+      setIsDeletingMember(false);
+    }
   };
 
   const isTeamClusterAttendanceView = activeNav === "Team Cluster Attendance";
+  const [myRequestsFilter, setMyRequestsFilter] = useState(null);
+  const [teamRequestsFilter, setTeamRequestsFilter] = useState(null);
+  const [teamAttendanceFilter, setTeamAttendanceFilter] = useState(null);
+
+  const filteredMyRequests = useMemo(() => {
+    if (!myRequestsFilter || myRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return myRequests;
+    return myRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (myRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (myRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (myRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [myRequests, myRequestsFilter]);
+
+  const filteredTeamRequests = useMemo(() => {
+    if (!teamRequestsFilter || teamRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return teamRequests;
+    return teamRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (teamRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [teamRequests, teamRequestsFilter]);
+
+  const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
+  const teamRequestHighlights = useMemo(() => buildRequestHighlights(teamRequests), [teamRequests]);
+
   const isMyRequestsView = activeNav === "My Requests";
   const isTeamRequestView = activeNav === "File Request";
-  const myRequestHighlights = buildRequestHighlights(myRequests);
-  const teamRequestHighlights = buildRequestHighlights(teamRequests);
   const isFilingCenterView = activeNav === "My Filing Center";
   const attendanceViewTitle = activeNav === "Team Cluster Attendance" ? "Team Cluster Attendance" : "My Attendance";
+
+  const handleHighlightFilterChange = (setter) => (id) => {
+    setter(current => current === id ? null : id);
+  };
+
+  const teamAttendanceHighlights = useMemo(() => {
+    const total = attendanceRows.length;
+    const timedIn = attendanceRows.filter(member => member.time_in_at && !member.time_out_at).length;
+    const completed = attendanceRows.filter(member => member.time_in_at && member.time_out_at).length;
+
+    return [
+      { key: 'total', label: 'Employees', value: total, icon: Users, accentClass: 'is-slate', subValue: 'Total roster' },
+      { key: 'timed-in', label: 'Timed In', value: timedIn, icon: LogIn, accentClass: 'is-blue', subValue: 'Active now' },
+      { key: 'completed', label: 'Completed', value: completed, icon: CheckCircle, accentClass: 'is-green', subValue: 'Shift finished' }
+    ];
+  }, [attendanceRows]);
+
   const filteredAttendanceRows = useMemo(() => {
     const query = attendanceQuery.trim().toLowerCase();
-    const filteredRows = attendanceRows.filter(member => {
+    const baseFiltered = attendanceRows.filter(member => {
       const name = member.fullname?.toLowerCase() ?? "";
       const tag = member.attendance_tag?.toLowerCase() ?? "";
-      return name.includes(query) || tag.includes(query);
+      const matchesQuery = name.includes(query) || tag.includes(query);
+
+      if (!matchesQuery) return false;
+
+      if (!teamAttendanceFilter) return true;
+      if (teamAttendanceFilter === 'total') return true;
+      if (teamAttendanceFilter === 'timed-in') return !!member.time_in_at && !member.time_out_at;
+      if (teamAttendanceFilter === 'completed') return !!member.time_in_at && !!member.time_out_at;
+      return true;
     });
 
     const getTimestamp = member => {
@@ -1320,7 +1361,7 @@ export default function CoachDashboard() {
 
     const compareNames = (a, b) => (a.fullname ?? "").localeCompare(b.fullname ?? "");
 
-    return [...filteredRows].sort((a, b) => {
+    return [...baseFiltered].sort((a, b) => {
       if (attendanceSort === attendanceSortOptions.nameAz) return compareNames(a, b);
       if (attendanceSort === attendanceSortOptions.nameZa) return compareNames(b, a);
 
@@ -1332,7 +1373,7 @@ export default function CoachDashboard() {
       if (attendanceSort === attendanceSortOptions.latestAttendanceFirst) return aTimestamp - bTimestamp;
       return bTimestamp - aTimestamp;
     });
-  }, [attendanceQuery, attendanceRows, attendanceSort]);
+  }, [attendanceQuery, attendanceRows, attendanceSort, teamAttendanceFilter]);
 
   const getMemberCurrentDayScheduleDetails = member => {
     const normalizedSchedule = normalizeAttendanceSchedule(member?.schedule);
@@ -1413,13 +1454,6 @@ export default function CoachDashboard() {
     return [...new Set(subTags)].filter(subTag => subTag !== "Off Scheduled");
   };
 
-  const attendanceSummary = useMemo(() => {
-    const total = attendanceRows.length;
-    const timedIn = attendanceRows.filter(member => member.time_in_at && !member.time_out_at).length;
-    const completed = attendanceRows.filter(member => member.time_in_at && member.time_out_at).length;
-    return { total, timedIn, completed };
-  }, [attendanceRows]);
-
   const filteredAttendanceHistory = useMemo(() => {
     if (!selectedMember || !Array.isArray(selectedMember.attendance_history)) return [];
     if (!historyDateStartFilter && !historyDateEndFilter) return selectedMember.attendance_history;
@@ -1451,13 +1485,11 @@ export default function CoachDashboard() {
       tag: entry.tag ?? "",
       note: entry.note ?? ""
     });
-    setAttendanceSaveError("");
   };
 
   const handleSaveTeamAttendanceEdit = async () => {
     if (!selectedAttendanceEntry?.id || !selectedMember?.id || !dashboardCluster?.id) return;
     setIsSavingAttendanceEdit(true);
-    setAttendanceSaveError("");
 
     try {
       await apiFetch("api/coach/coach_update_attendance.php", {
@@ -1498,9 +1530,9 @@ export default function CoachDashboard() {
           });
         }
       }
-      setAttendanceSaveError("Attendance updated successfully.");
+      showToast({ title: "Attendance Updated", message: "Attendance record updated successfully.", type: "success" });
     } catch (err) {
-      setAttendanceSaveError(err?.error ?? "Unable to update attendance record.");
+      showToast({ title: "Update Failed", message: err?.error ?? "Unable to update attendance record.", type: "error" });
     } finally {
       setIsSavingAttendanceEdit(false);
     }
@@ -1513,13 +1545,12 @@ export default function CoachDashboard() {
     fetchTeamRequests()
       .then(response => {
         setTeamRequests(Array.isArray(response) ? response : []);
-        setTeamRequestsError("");
       })
       .catch(() => {
         setTeamRequests([]);
-        setTeamRequestsError("Unable to load file requests.");
+        showToast({ title: "Load Failed", message: "Unable to load team filing requests.", type: "error" });
       });
-  }, [activeNav, canViewAttendance]);
+  }, [activeNav, canViewAttendance, showToast]);
 
   const getTeamRequestActionConfirmationMessage = (request, status) => {
     const requestType = request?.request_type ?? "this request";
@@ -1541,7 +1572,6 @@ export default function CoachDashboard() {
     if (!hasConfirmedAction) return;
 
     setRequestActionLoadingId(request.id);
-    setTeamRequestsError("");
     try {
       await updateTeamRequestStatus({
         request_source: request.request_source,
@@ -1550,8 +1580,17 @@ export default function CoachDashboard() {
       });
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
+      showToast({
+        title: "Status Updated",
+        message: `Request for ${request.employee_name} has been ${status.toLowerCase()} successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to update file request status.");
+      showToast({
+        title: "Action Failed",
+        message: error?.error ?? error?.message ?? "Unable to update file request status.",
+        type: "error"
+      });
     } finally {
       setRequestActionLoadingId("");
     }
@@ -1590,8 +1629,11 @@ export default function CoachDashboard() {
         ) : isAttendanceView && canViewAttendance ? (
           <section className="content">
             {isFilingCenterView ? (
-              <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
-            ) : (
+              <FilingCenterPanel
+                initialTab={filingCenterInitialTab}
+                initialDate={filingCenterInitialDate}
+                onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))}
+              />            ) : (
               <div className="employee-card employee-attendance-history-card">
                 <div className="employee-card-header">
                   <div>
@@ -1608,16 +1650,23 @@ export default function CoachDashboard() {
                 <div className="employee-card-body">
                   {isMyRequestsView ? (
                     <>
-                      <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                      <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
+                      <AttendanceHistoryHighlights 
+                        highlights={myRequestHighlights} 
+                        activeFilter={myRequestsFilter}
+                        onFilterChange={handleHighlightFilterChange(setMyRequestsFilter)}
+                      />
+                      <DataPanel type="requests" records={filteredMyRequests} enableRequestFilters showRequestActionBy />
                     </>
                   ) : isTeamRequestView ? (
                     <>
-                      <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
-                      {teamRequestsError && <div className="error">{teamRequestsError}</div>}
+                      <AttendanceHistoryHighlights 
+                        highlights={teamRequestHighlights} 
+                        activeFilter={teamRequestsFilter}
+                        onFilterChange={handleHighlightFilterChange(setTeamRequestsFilter)}
+                      />
                       <DataPanel
                         type="requests"
-                        records={teamRequests}
+                        records={filteredTeamRequests}
                         onRequestAction={handleTeamRequestAction}
                         requestActionLoadingId={requestActionLoadingId}
                         requestActions={[
@@ -1633,29 +1682,28 @@ export default function CoachDashboard() {
                   ) : isTeamClusterAttendanceView ? (
                     <>
                       {activeMembersLoading && <div className="modal-text">Loading attendance records...</div>}
-                      {!activeMembersLoading && activeMembersError && <div className="error">{activeMembersError}</div>}
-                      {!activeMembersLoading && !activeMembersError && !dashboardCluster && (
+                      {!activeMembersLoading && !dashboardCluster && (
                         <div className="empty-state">No active team cluster found. Attendance records will appear once a cluster is active.</div>
                       )}
-                      {!activeMembersLoading && !activeMembersError && dashboardCluster && (
+                      {!activeMembersLoading && dashboardCluster && (
                         <>
                           <div className="section-title">{dashboardCluster.name} Attendance ({attendanceDateFilter})</div>
-                          <div className="attendance-summary-grid">
-                            <div className="overview-card"><div className="overview-label">Employees</div><div className="overview-value">{attendanceSummary.total}</div></div>
-                            <div className="overview-card"><div className="overview-label">Timed In</div><div className="overview-value">{attendanceSummary.timedIn}</div></div>
-                            <div className="overview-card"><div className="overview-label">Completed Shift</div><div className="overview-value">{attendanceSummary.completed}</div></div>
-                          </div>
-                          <div className="attendance-controls">
-                            <label className="attendance-search" htmlFor="attendance-search-input">
-                              <span>Search</span>
+                          <AttendanceHistoryHighlights 
+                            highlights={teamAttendanceHighlights} 
+                            activeFilter={teamAttendanceFilter}
+                            onFilterChange={handleHighlightFilterChange(setTeamAttendanceFilter)}
+                          />
+                          <div className="employee-list-controls">
+                            <label className="employee-search-field" htmlFor="attendance-search-input">
+                              <span className="employee-control-label">Search</span>
                               <input id="attendance-search-input" type="search" placeholder="Search by name or attendance tag" value={attendanceQuery} onChange={event => setAttendanceQuery(event.target.value)} />
                             </label>
-                            <label className="attendance-date" htmlFor="attendance-date-filter">
-                              <span>Date</span>
+                            <label className="employee-search-field" htmlFor="attendance-date-filter" style={{ flex: "0 0 180px" }}>
+                              <span className="employee-control-label">Date</span>
                               <input id="attendance-date-filter" type="date" value={attendanceDateFilter} onChange={event => setAttendanceDateFilter(event.target.value || getTodayDateInputValue())} />
                             </label>
-                            <label className="attendance-sort" htmlFor="attendance-sort-select">
-                              <span>Sort</span>
+                            <label className="employee-rows-field" htmlFor="attendance-sort-select" style={{ flex: "0 0 240px" }}>
+                              <span className="employee-control-label">Sort</span>
                               <select id="attendance-sort-select" value={attendanceSort} onChange={event => setAttendanceSort(event.target.value)}>
                                 <option value={attendanceSortOptions.newestAttendanceFirst}>Newest attendance first</option>
                                 <option value={attendanceSortOptions.latestAttendanceFirst}>Latest attendance first</option>
@@ -1677,7 +1725,6 @@ export default function CoachDashboard() {
                                   onClick={() => {
                                     setSelectedMember(member);
                                     setSelectedAttendanceEntry(null);
-                                    setAttendanceSaveError("");
                                     setHistoryDateStartFilter("");
                                     setHistoryDateEndFilter("");
                                   }}
@@ -1686,8 +1733,8 @@ export default function CoachDashboard() {
                                     <div>{member.fullname}</div>
                                     <div className="attendance-current-schedule">{getMemberCurrentDaySchedule(member)}</div>
                                   </div>
-                                  <div className="table-cell">{formatDateTimeLabel(member.time_in_at)}</div>
-                                  <div className="table-cell">{formatDateTimeLabel(member.time_out_at)}</div>
+                                  <div className="table-cell">{formatDateTime(member.time_in_at)}</div>
+                                  <div className="table-cell">{formatDateTime(member.time_out_at)}</div>
                                   <div className="table-cell attendance-main-tag-cell">
                                     <span className={`member-status-tag ${getAttendanceMainTag(member) ? "is-active" : ""}`}>{getAttendanceMainTag(member)}</span>
                                     <div className="attendance-subtag-list">
@@ -1705,7 +1752,11 @@ export default function CoachDashboard() {
                     <>
                       <div className="employee-card">
                         <div className="employee-card-body employee-card-body-flush">
-                          <AttendanceModule records={coachAttendanceHistory} onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
+                          <AttendanceModule records={coachAttendanceHistory} onDisputeClick={record => {
+                          setFilingCenterInitialTab("dispute");
+                          setFilingCenterInitialDate(record.date);
+                          setActiveNav("My Filing Center");
+                        }} />
                         </div>
                       </div>
                     </>
@@ -1714,14 +1765,14 @@ export default function CoachDashboard() {
               </div>
             )}
             {isTeamClusterAttendanceView && selectedMember && (
-              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setAttendanceSaveError(""); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
+              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
                 <section className="modal-card attendance-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
                   <header className="modal-header">
                     <div>
                       <h3 className="modal-title">{selectedMember.fullname}</h3>
                       <p className="modal-subtitle">Attendance details</p>
                     </div>
-                    <button type="button" className="btn secondary" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setAttendanceSaveError(""); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
+                    <button type="button" className="btn secondary" onClick={() => { setSelectedMember(null); setSelectedAttendanceEntry(null); setHistoryDateStartFilter(""); setHistoryDateEndFilter(""); }}>
                       Close
                     </button>
                   </header>
@@ -1749,10 +1800,10 @@ export default function CoachDashboard() {
                                     role="row"
                                     onClick={() => canEditAttendance && openAttendanceEditModal(entry)}
                                   >
-                                    <span role="cell">{formatDateTimeLabel(entry.time_in_at ?? entry.time_out_at)}</span>
+                                    <span role="cell">{formatDateTime(entry.time_in_at ?? entry.time_out_at)}</span>
                                     <span role="cell">{dashboardCluster?.name ?? "—"}</span>
-                                    <span role="cell">{formatDateTimeLabel(entry.time_in_at)}</span>
-                                    <span role="cell">{formatDateTimeLabel(entry.time_out_at)}</span>
+                                    <span role="cell">{formatDateTime(entry.time_in_at)}</span>
+                                    <span role="cell">{formatDateTime(entry.time_out_at)}</span>
                                     <span role="cell" className="attendance-tag-cell">
                                       <span className={`member-status-tag ${historyTag ? "is-active" : ""}`}>{historyTag}</span>
                                       <span className="btn attendance-tag-edit-button">{canEditAttendance ? "Edit" : "View"}</span>
@@ -1775,14 +1826,14 @@ export default function CoachDashboard() {
             )}
 
             {isTeamClusterAttendanceView && selectedMember && selectedAttendanceEntry && (
-              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedAttendanceEntry(null); setAttendanceSaveError(""); }}>
+              <div className="modal-overlay" role="presentation" onClick={() => { setSelectedAttendanceEntry(null); }}>
                 <section className="modal-card attendance-edit-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
                   <header className="modal-header">
                     <div>
                       <h3 className="modal-title">Edit Attendance Entry</h3>
                       <p className="modal-subtitle">{selectedMember.fullname}</p>
                     </div>
-                    <button type="button" className="btn secondary" onClick={() => { setSelectedAttendanceEntry(null); setAttendanceSaveError(""); }}>Close</button>
+                    <button type="button" className="btn secondary" onClick={() => { setSelectedAttendanceEntry(null); }}>Close</button>
                   </header>
                   <div className="modal-body">
                     <div className="attendance-history-range-filter" role="group" aria-label="Edit attendance values">
@@ -1799,7 +1850,6 @@ export default function CoachDashboard() {
                     </div>
                     <div className="attendance-edit-actions">
                       <button className="btn primary" type="button" disabled={isSavingAttendanceEdit} onClick={handleSaveTeamAttendanceEdit}>{isSavingAttendanceEdit ? "Saving..." : "Save Attendance"}</button>
-                      {attendanceSaveError && <span className="attendance-detail-value">{attendanceSaveError}</span>}
                     </div>
                   </div>
                 </section>
@@ -1926,7 +1976,6 @@ export default function CoachDashboard() {
                   />
                 </label>
               </div>
-              {error && <div className="error">{error}</div>}
               <div className="form-actions">
                 <button
                   className="btn secondary"
@@ -1979,7 +2028,7 @@ export default function CoachDashboard() {
                     {c.description || "—"}
                   </div>
                   <div className="table-cell">{c.members ?? 0}</div>
-                  <div className="table-cell">{formatDate(c.created_at)}</div>
+                  <div className="table-cell">{formatFullDate(c.created_at)}</div>
                   <div className="table-cell">
                     <span className={`badge ${c.status}`}>{c.status}</span>
                   </div>
@@ -2038,13 +2087,10 @@ export default function CoachDashboard() {
               {activeMembersLoading && (
                 <div className="modal-text">Loading members...</div>
               )}
-              {!activeMembersLoading && activeMembersError && (
-                <div className="error">{activeMembersError}</div>
-              )}
-              {!activeMembersLoading && !activeMembersError && activeMembers.length === 0 && (
+              {!activeMembersLoading && activeMembers.length === 0 && (
                 <div className="empty-state">No employees added to the active cluster yet.</div>
               )}
-              {!activeMembersLoading && !activeMembersError && displayedActiveMembers.length > 0 && (
+              {!activeMembersLoading && displayedActiveMembers.length > 0 && (
                 <div className="active-members-schedule-table" role="table" aria-label="Active team schedule">
                   <div className="active-members-schedule-header" role="row">
                     <span role="columnheader">Members</span>
@@ -2184,7 +2230,6 @@ export default function CoachDashboard() {
                     ))}
                   </div>
                 )}
-                {memberError && <div className="error">{memberError}</div>}
                 <div className="member-actions">
                   <button
                     className="btn primary"
@@ -2198,14 +2243,12 @@ export default function CoachDashboard() {
                     <span className="modal-text">Loading employees...</span>
                   )}
                   {!employeeLoading &&
-                    availableEmployees.length === 0 &&
-                    !employeeError && (
+                    availableEmployees.length === 0 && (
                       <span className="modal-text">
                         All employees are already assigned.
                       </span>
                     )}
                 </div>
-                {employeeError && <div className="error">{employeeError}</div>}
                 {showMemberForm && availableEmployees.length > 0 && (
                  <div className="member-form manage-team-form-card">
                     <div className="member-form-head">
@@ -2447,7 +2490,7 @@ export default function CoachDashboard() {
                                   <div className="schedule-time-label">Break End</div>
                                   <select
                                     className="schedule-break-select"
-                                    value={`${daySchedule.breakEndTime}|${daySchedule.breakEndPeriod}`}
+                                    value={`${daySchedule.breakEndTime}|${daySchedule.breakStartPeriod}`}
                                     onChange={event =>
                                       handleChangeDayTime(day, "breakEnd", event.target.value)
                                     }
@@ -2475,7 +2518,6 @@ export default function CoachDashboard() {
                   </div>
                 </div>
                 <div className="form-actions">
-                  {scheduleError && <div className="error">{scheduleError}</div>}
                   <button
                     className="btn secondary"
                     type="button"
@@ -2492,35 +2534,6 @@ export default function CoachDashboard() {
                     {isSavingSchedule ? "Saving..." : "Save Schedule"}
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {confirmState && (
-          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={confirmState.title}>
-            <div className="modal-card confirm-modal-card">
-              <div>
-                <h3 className="confirm-modal-title">{confirmState.title}</h3>
-                <p className="confirm-modal-message">{confirmState.message}</p>
-              </div>
-              <div className="confirm-modal-actions">
-                <button
-                  className="btn confirm-cancel-btn"
-                  type="button"
-                  onClick={() => setConfirmState(null)}
-                  disabled={isDeletingMember || isDisbanding}
-                >
-                  Cancel
-                </button>
-                <button
-                  className={`btn ${confirmState.variant === "danger" ? "confirm-danger-btn" : "primary"}`}
-                  type="button"
-                  onClick={handleConfirmAction}
-                  disabled={isDeletingMember || isDisbanding}
-                >
-                  {confirmState.confirmLabel}
-                </button>
               </div>
             </div>
           </div>

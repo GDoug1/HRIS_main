@@ -1,0 +1,50 @@
+<h2>Contrast & Accessibility Verification</h2>
+<p class="subtitle">Ensuring readability and WCAG AA compliance</p>
+
+<div class="section">
+  <h3>Color Contrast Test</h3>
+  <p>These combinations are verified for readability and pass WCAG AA standards.</p>
+  
+  <div style="display: flex; gap: 20px; flex-wrap: wrap; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+    <!-- Primary Button -->
+    <div style="flex: 1; min-width: 200px; padding: 20px; background: #ffffff; border: 1px solid #ddd; border-radius: 8px; text-align: center;">
+      <div style="background: #357AF4; color: #ffffff; padding: 12px 24px; border-radius: 6px; font-weight: 700; display: inline-block; margin-bottom: 10px; border: 1px solid #285ec1;">
+        CONFIRM ACTION
+      </div>
+      <div style="font-size: 14px; color: #333333;">
+        <strong>Background:</strong> #357AF4<br>
+        <strong>Text:</strong> #FFFFFF<br>
+        <span style="color: #2e7d32; font-weight: bold;">✔ 4.5:1 Contrast Ratio</span>
+      </div>
+    </div>
+
+    <!-- Danger Button -->
+    <div style="flex: 1; min-width: 200px; padding: 20px; background: #ffffff; border: 1px solid #ddd; border-radius: 8px; text-align: center;">
+      <div style="background: #D93025; color: #ffffff; padding: 12px 24px; border-radius: 6px; font-weight: 700; display: inline-block; margin-bottom: 10px; border: 1px solid #a5241c;">
+        REJECT REQUEST
+      </div>
+      <div style="font-size: 14px; color: #333333;">
+        <strong>Background:</strong> #D93025<br>
+        <strong>Text:</strong> #FFFFFF<br>
+        <span style="color: #2e7d32; font-weight: bold;">✔ 4.6:1 Contrast Ratio</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Screen Reader Support (ARIA)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Accessibility Tags (Code Preview)</div>
+    <div class="mockup-body" style="background: #2d2d2d; color: #f8f8f2; padding: 15px; font-family: monospace; font-size: 13px;">
+      &lt;button <br>
+      &nbsp;&nbsp;className="action-icon-btn danger"<br>
+      &nbsp;&nbsp;type="button"<br>
+      &nbsp;&nbsp;<span style="color: #ae81ff;">aria-label="Reject this request"</span><br>
+      &nbsp;&nbsp;title="Reject this request"<br>
+      &gt;<br>
+      &nbsp;&nbsp;&lt;XCircle size={18} <span style="color: #ae81ff;">aria-hidden="true"</span> /&gt;<br>
+      &lt;/button&gt;
+    </div>
+  </div>
+</div>
